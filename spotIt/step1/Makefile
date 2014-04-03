@@ -49,7 +49,7 @@ LDFLAGS= $(OPENCV-LIBS)
 
 BUILD-DIR=build
 OBJS=$(addprefix $(BUILD-DIR)/, main.o spotIt.o)
-PROG=$(BUILD-DIR)/spotit
+PROG=$(BUILD-DIR)/spotIt
 
 
 

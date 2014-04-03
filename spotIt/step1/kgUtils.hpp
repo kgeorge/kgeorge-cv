@@ -30,18 +30,18 @@
 #endif
 
 namespace Kg {
-
-
+    
+    
     inline float uRand0To1() {
         return static_cast<float>(rand())/RAND_MAX;
     }
-
+    
     template<typename T >
     T min( T a, T b ) {
         return a <= b ? a: b;
     }
-
-
+    
+    
     template<typename T >
     T max( T a, T b ) {
         return a >= b ? a: b;

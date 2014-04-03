@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		C163947F18EC7E7300698CF5 /* kgUtils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = kgUtils.cpp; path = ../../kgUtils.cpp; sourceTree = "<group>"; };
 		C163948018EC7E7300698CF5 /* kgUtils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = kgUtils.hpp; path = ../../kgUtils.hpp; sourceTree = "<group>"; };
 		C163948118EC7E8200698CF5 /* spotIt.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = spotIt.cpp; path = ../../spotIt.cpp; sourceTree = "<group>"; };
 		C163948218EC7E8200698CF5 /* spotIt.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = spotIt.hpp; path = ../../spotIt.hpp; sourceTree = "<group>"; };
@@ -22,7 +21,6 @@
 			children = (
 				C163948118EC7E8200698CF5 /* spotIt.cpp */,
 				C163948218EC7E8200698CF5 /* spotIt.hpp */,
-				C163947F18EC7E7300698CF5 /* kgUtils.cpp */,
 				C163948018EC7E7300698CF5 /* kgUtils.hpp */,
 				C1CDDDBE18EB156F00F235B4 /* kMeansClustering.hpp */,
 				C1DDD2F918DFAFC500288E63 /* main.cpp */,

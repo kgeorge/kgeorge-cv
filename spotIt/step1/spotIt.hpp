@@ -18,45 +18,45 @@
 #include <opencv2/core/core.hpp>
 
 void spotItProcessCircle(
-    cv::Point &circleCenter,  //center of circular region
-    double circleRadius,  //radius of circular region
-    cv::Mat & image,   //input image
-    cv::Mat &roiOutputImageCopy //output image of circular region
+                         cv::Point &circleCenter,  //center of circular region
+                         double circleRadius,  //radius of circular region
+                         cv::Mat & image,   //input image
+                         cv::Mat &roiOutputImageCopy //output image of circular region
 
-    );
+);
 
 
 class SpotIt {
-    public:
+public:
     SpotIt(){}
-
+    
     ~SpotIt(){}
     //returns true if successfully processed the circle
     bool processCircle(
-        cv::Point &circleCenter,
-        float circleRadius,
-        cv::Mat &inputImage,
-        cv::Mat &roiOutputImageCopy);
-
-    protected:
-
+                       cv::Point &circleCenter,
+                       float circleRadius,
+                       cv::Mat &inputImage,
+                       cv::Mat &roiOutputImageCopy);
+    
+protected:
+    
     void cluster(
-          const cv::Mat &roiHueComponentImage, //in
-          const std::vector< std::vector< cv::Point > > &contours,//in
-          const  std::vector<bool> &shouldProcessContour, //in
-          std::vector<int> &clusterAssignments, //out
-          int &numClusters, //out
-          float &sse //out, sum of squared error
-           );
-
-
+                 const cv::Mat &roiHueComponentImage, //in
+                 const std::vector< std::vector< cv::Point > > &contours,//in
+                 const  std::vector<bool> &shouldProcessContour, //in
+                 std::vector<int> &clusterAssignments, //out
+                 int &numClusters, //out
+                 float &sse //out, sum of squared error
+    );
+    
+    
     void drawOutput(
-        const std::vector<std::vector<cv::Point>> &contours,
-        const std::vector<bool> &shouldProcessContour,
-        const std::vector<int> &clusterAssignments,
-        cv::Mat &inputImage,
-        cv::Mat &roiOutputImage);
-
+                    const std::vector<std::vector<cv::Point>> &contours,
+                    const std::vector<bool> &shouldProcessContour,
+                    const std::vector<int> &clusterAssignments,
+                    cv::Mat &inputImage,
+                    cv::Mat &roiOutputImage);
+    
 };
 
 
