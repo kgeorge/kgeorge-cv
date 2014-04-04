@@ -152,7 +152,6 @@ void  KMeansClustering<T, TTraits>::doIt(
         }
         
         for(int j=0; j < nItems; ++j) {
-            assert(items[j].nPointsInContour > 0);
             clusterCentersBackBuffer[clusterAssignments[j]] = clusterCentersBackBuffer[clusterAssignments[j]] +  TTraits::getContribution(items[j]);
             numItemsInCluster[clusterAssignments[j]] += TTraits::getContributingNumber(items[j]);
         }

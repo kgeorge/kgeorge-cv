@@ -353,47 +353,6 @@ struct ClusterItem {
 };
 
 
-
-
-
-template<>
-KMeansClustering<ContourRepresentativePoint>::~KMeansClustering(){}
-
-
-
-template<>
-struct KMeansDataElementTraits<ContourRepresentativePoint>{
-    typedef ContourRepresentativePoint T;
-    
-    static float getMinDist(float minDist, const T &c) {
-        return minDist;
-    }
-    
-    static ContourRepresentativePoint& getContribution( ContourRepresentativePoint &c) {
-        return c;
-    }
-    
-    static const ContourRepresentativePoint& getContribution( const ContourRepresentativePoint &c) {
-        return c;
-    }
-    
-    static int getContributingNumber( const T &c) {
-        return 1;
-    }
-    
-    
-    static  bool validate( const ContourRepresentativePoint &c) {
-        return c.nPointsInContour > 0;
-    }
-    
-    static float dist(const ContourRepresentativePoint &lhs, const ContourRepresentativePoint &rhs) {
-        //Scalar cDiff = lhs.hsvColor - rhs.hsvColor;
-        Point pDiff = lhs.meanPoint - rhs.meanPoint;
-        return pDiff.x * pDiff.x + pDiff.y * pDiff.y  ;
-    }
-};
-
-
 template<>
 struct KMeansDataElementTraits<ClusterItem>{
     typedef ClusterItem T;
