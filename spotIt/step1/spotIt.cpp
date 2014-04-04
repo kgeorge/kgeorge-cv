@@ -290,8 +290,8 @@ struct KMeansDataElementTraits<ContourRepresentativePoint>{
     }
     
     static float dist(const ContourRepresentativePoint &lhs, const ContourRepresentativePoint &rhs) {
-        Scalar pdiff = lhs.hsvColor - rhs.hsvColor;
-        return pdiff[0] * pdiff[0] ;
+        Point2f pdiff = lhs.meanPoint - rhs.meanPoint;
+        return pdiff.x * pdiff.x + pdiff.y * pdiff.y ;
     }
 };
 
