@@ -51,6 +51,7 @@ bool SpotIt::processCircle(
     
     Mat  roiGrayImage, roiHsvImage;
     //copy to
+    blur(tempImage, tempImage, cv::Size(3,3));
     cvtColor(tempImage, roiGrayImage, CV_BGR2GRAY);
     cvtColor(tempImage, roiHsvImage, CV_BGR2HSV);
     vector<Mat> roiHsvComponents;
@@ -345,6 +346,7 @@ struct ClusterItem {
         return *this;
     }
 
+    //last weignt item is the sum of all other weights
     friend float dot(const ClusterItem &lhs, const ClusterItem &rhs , const float weights[]) {
         return (weights[0] * lhs.data_[0] * rhs.data_[0] +  weights[1] * lhs.data_[1] * rhs.data_[1] +  weights[2] * lhs.data_[2] * rhs.data_[2] + weights[3] * lhs.data_[3] * rhs.data_[3])/weights[4];
     }
@@ -386,7 +388,12 @@ struct KMeansDataElementTraits<ClusterItem>{
     }
 };
 
-
+    //weights for calculating distance between clusterItem components.
+    //x position weight = 1
+    //y position weignt = 1
+    //hue value weight = 9
+    //unused component weight = 0
+    //sum of all weights = 11
     const float KMeansDataElementTraits<ClusterItem>::weights[] = {1,1,9,0,11};
 
 
