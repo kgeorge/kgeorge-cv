@@ -36,7 +36,8 @@ int main(int argc, char **argv) {
     
     Mat roiOutputImageLast;
     SpotIt spotIt;
-    for(;;) {
+    bool continueProcessing = true;
+    for(; continueProcessing ;) {
         //for each frame
         Mat frame;
         Mat roiOutputImage;
@@ -92,7 +93,7 @@ int main(int argc, char **argv) {
             case 'S':
                 //save the output image in current directory
                 imwrite("roiOutputImageLast.jpg", roiOutputImageLast );
-                
+                continueProcessing = false;
                 break;
             default:
                 break;
