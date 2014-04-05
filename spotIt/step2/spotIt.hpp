@@ -17,13 +17,7 @@
 
 #include <opencv2/core/core.hpp>
 
-void spotItProcessCircle(
-                         cv::Point &circleCenter,  //center of circular region
-                         double circleRadius,  //radius of circular region
-                         cv::Mat & image,   //input image
-                         cv::Mat &roiOutputImageCopy //output image of circular region
-
-);
+struct ClusterItem;
 
 class SpotIt {
 public:
@@ -55,6 +49,10 @@ protected:
                     const std::vector<int> &clusterAssignments,
                     cv::Mat &inputImage,
                     cv::Mat &roiOutputImage);
+    bool customInitialClusterAssignment( int k,
+                                        const std::vector<ClusterItem> &items,
+                                        std::vector<ClusterItem> &clusterCenters);
+
     
 };
 

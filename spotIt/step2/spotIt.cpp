@@ -9,6 +9,7 @@
 
 #include <ctime>
 #include <cmath>
+#include <set>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -153,11 +154,11 @@ void SpotIt::drawOutput(
         Scalar(255, 255, 0),
         Scalar(255, 0, 255),
         Scalar(0, 255, 255),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(128, 255), rng1.uniform(128,255), rng1.uniform(128,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(128,255) ),
+        Scalar( rng1.uniform(128, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(128,255), rng1.uniform(128,255) ),
+        Scalar( rng1.uniform(60, 255), rng1.uniform(60,255), rng1.uniform(60,255) ),
         Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
         Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
         Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
@@ -290,7 +291,7 @@ struct ContourRepresentativePoint {
             cRepPoint.meanPoint -= cpAvg.meanPoint;
             cRepPoint.meanPoint.x /= (sqrt(cpAvg.variance.x) + 0.000001);
             cRepPoint.meanPoint.y /= (sqrt(cpAvg.variance.y) + 0.000001);
-            cRepPoint.hsvColor = cpAvg.hsvColor;
+            cRepPoint.hsvColor -= cpAvg.hsvColor;
             cRepPoint.hsvColor[0] /= sqrt(cpAvg.hsvVariance[0]);
             cRepPoint.hsvColor[1] /= sqrt(cpAvg.hsvVariance[1]);
             cRepPoint.hsvColor[2] /= sqrt(cpAvg.hsvVariance[2]);
@@ -348,7 +349,7 @@ struct ClusterItem {
         return *this;
     }
     
-    //last weignt item is the sum of all other weights
+    //last weight item is the sum of all other weights
     friend float dot(const ClusterItem &lhs, const ClusterItem &rhs , const float weights[]) {
         return (weights[0] * lhs.data_[0] * rhs.data_[0] +  weights[1] * lhs.data_[1] * rhs.data_[1] +  weights[2] * lhs.data_[2] * rhs.data_[2] + weights[3] * lhs.data_[3] * rhs.data_[3])/weights[4];
     }
@@ -420,6 +421,108 @@ struct std::less<ClusterItem> : std::binary_function<ClusterItem, ClusterItem, b
 };
 
 
+
+//order the element for custom initialization
+template<typename T, typename TTraits = KMeansDataElementTraits<T> >
+struct InitComp : std::binary_function<T, T, bool> {
+
+    InitComp( const T &refElement):refElement(refElement){}
+
+    bool operator()(const T &l, const T &r) {
+        float lmin = TTraits::dist(l, refElement);
+        float rmin = TTraits::dist(r, refElement);
+        return lmin < rmin;
+    }
+
+    const T &refElement;
+};
+
+
+
+bool SpotIt::customInitialClusterAssignment( int k,
+                                            const vector<ClusterItem> &items,
+                                            vector<ClusterItem> &clusterCenters
+) {
+        clusterCenters.assign(k, ClusterItem());
+
+        static RNG rng1(12345);
+
+        //first let us get some statistics about the items
+        //get component-wise minimum, maximum and average
+        float minComponents[4];
+        float maxComponents[4];
+        for(int i=0; i < 4; ++i ) {
+            minComponents[i] = numeric_limits<float>::max();
+            maxComponents[i] = -numeric_limits<float>::max();
+        }
+
+        for(int i=0; i < items.size(); ++i) {
+            const ClusterItem & it = items[i];
+            for(int j=0; j < 4; ++j ) {
+                minComponents[j] = Kg::min(it.data_[j], minComponents[j]);
+                maxComponents[j] = Kg::max(it.data_[j], maxComponents[j]);
+            }
+        }
+
+        //container for storing already selected clusterCenters
+        set<ClusterItem, std::less<ClusterItem> > itemsSoFarSelectedForInitialization;
+        //select up to k non-unique items
+        for(int m=0; m < k; ++m) {
+            int maxIterations = 100;
+            ClusterItem prospectiveItem;
+            //our initialization should ideally produce clusterCenters which have a pairwise distance of 'minimumDistanceBetweenSelectedClusterCenters'
+            float minimumDistanceBetweenSelectedClusterCenters = 0.2f;
+            bool foundMthClusterCenter = false;
+            while ( !foundMthClusterCenter && (minimumDistanceBetweenSelectedClusterCenters /= 2.0f) > 0.0001) {
+                //if we cant find good initializations in 100 iterations
+                //try reducing minimumDistanceBetweenSelectedClusterCenters
+                while(--maxIterations > 0) {
+                    //for the first 25 iterations try clusterCenters from the input items
+                    if(maxIterations > 75 ) {
+                        float r = 1;
+                        while(r >= 1.0f) {
+                            r = Kg::uRand0To1();
+                        }
+
+                        int prospectiveItemIndex =  floor(r * items.size());
+                        assert( prospectiveItemIndex < items.size());
+                        prospectiveItem = items[prospectiveItemIndex];
+                    } else {
+                        //if the first 25 iterations doesnt yield k clusterCenters which are seperated by 'minimumDistanceBetweenSelectedClusterCenters'
+                        //try randomization of the range
+                        for(int j=0; j < 4; ++j) {
+                            prospectiveItem.data_[j] =   rng1.uniform(minComponents[j], maxComponents[j]);
+                        }
+                    }
+                    //compare already selected clusterCenters with prospectiveItem
+                    InitComp<ClusterItem, KMeansDataElementTraits<ClusterItem> > comp( prospectiveItem );
+                    auto min_elem_iter = std::min_element( itemsSoFarSelectedForInitialization.begin(), itemsSoFarSelectedForInitialization.end(), comp);
+                    float dist_from_other_elements_so_far = 0.0f;
+                    if(min_elem_iter != itemsSoFarSelectedForInitialization.end() ) {
+                        dist_from_other_elements_so_far = KMeansDataElementTraits<ClusterItem>::dist(*min_elem_iter, prospectiveItem );
+                    }
+                    if( (min_elem_iter == itemsSoFarSelectedForInitialization.end())  || dist_from_other_elements_so_far > minimumDistanceBetweenSelectedClusterCenters) {
+                        //if the prospectiveItem has a pairwise distance of atleast minimumDistanceBetweenSelectedClusterCenters,
+                        //the go ahead and move to the next 'm'th clusterItem
+                        itemsSoFarSelectedForInitialization.insert(prospectiveItem);
+                        foundMthClusterCenter = true;
+                        break;
+                    }
+                }
+            }
+            //hangup on failure
+            if( minimumDistanceBetweenSelectedClusterCenters <= 0.0001) {
+                KG_DBGOUT ( std::cout << "Custom Initialization:  cant find initialization"  << std::endl );
+                clusterCenters.clear();
+                return false;
+            }
+            
+            clusterCenters[m] = prospectiveItem;
+        }
+        return true;
+    }
+
+
 void SpotIt::cluster(
                      const Mat &roiHueComponentImage,
                      const vector< vector< Point > > &contours,
@@ -463,7 +566,12 @@ void SpotIt::cluster(
     
     //desired number of clusters
     int desiredK=9;
-    KMeansClustering<ClusterItem> cluster(desiredK, clusterItems);
+    
+    
+    //randomly initialize points from the image
+    vector<ClusterItem> clusterCentersInitialization;
+    bool wasSuccessful = customInitialClusterAssignment( desiredK, clusterItems, clusterCentersInitialization);
+    KMeansClustering<ClusterItem> cluster(desiredK, clusterItems, clusterCentersInitialization);
     //clustering
     cluster.doIt();
     
@@ -480,12 +588,4 @@ void SpotIt::cluster(
     }
     
     numClusters = desiredK;
-    
-    
-    //verification that each valid contour is assigned to a cluster
-    for(int j =0; j < outputClusterAssignments.size(); ++j) {
-        assert(clusterAssignments[j] >= 0);
-    }
-    
-    
 }

@@ -57,7 +57,8 @@ class KMeansClustering {
 public:
     KMeansClustering(
                      int nDesiredNumCluster,
-                     const std::vector<T> &items);
+                     const std::vector<T> &items,
+                     const std::vector<T> &userSpecifiedInit);
     
     ~KMeansClustering(){}
     
@@ -87,7 +88,7 @@ protected:
     //during each iteration,
     //if we end up with some curent clusers with no members,
     //then call this to do a redistribution
-    static float resolveEmptyClusters(
+    static void resolveEmptyClusters(
                                       std::vector<int> &numItemsInCluster,
                                       std::vector<int> &clusterAssignments,
                                       std::vector<T>   &clusterCentersBackBuffer,
@@ -98,9 +99,13 @@ protected:
     //randomly assign one item as a
     //cluster center
     void initialClusterAssignment();
+
+    void statsInitialClusterAssignment();
 protected:
     //input items
     const std::vector<T> &items;
+    //optional user specified initialization
+    const std::vector<T> &userSpecifiedInit;
     //k in kMeans
     int k;
     //output cluster assignments
@@ -128,10 +133,12 @@ protected:
 template<typename T, typename TTraits>
 KMeansClustering<T, TTraits>::KMeansClustering(
                                                int nDesiredNumCluster,
-                                               const std::vector<T> &items):
+                                               const std::vector<T> &items,
+                                               const std::vector<T> &userSpecifiedInit):
 items(items),
 k(nDesiredNumCluster),
-lastSSEForAllItems(0){
+lastSSEForAllItems(0),
+userSpecifiedInit(userSpecifiedInit){
     clusterAssignments.assign(items.size(), -1);
     clusterCenters.assign(k, T());
     clusterCentersBackBuffer.assign(k, T());
@@ -158,14 +165,13 @@ void  KMeansClustering<T, TTraits>::doIt(
         }
         return;
     }
-
+    
     //initialization
     initialClusterAssignment();
+
+    KG_DBGOUT( statsInitialClusterAssignment() );
     
-    
-    float deltaError = lastSSEForAllItems;
-    int emptyClusterIndices[4];
-    
+    float deltaError = lastSSEForAllItems;    
     for(int i =0; i < maxIterations && deltaError > 10.0 ; ++i) {
         
         float curSSEForAllItems = 0;
@@ -173,6 +179,7 @@ void  KMeansClustering<T, TTraits>::doIt(
         numItemsInCluster.assign(k, 0);
         for(int m=0; m < k; ++m){
             clusterCentersBackBuffer[m] = T();
+            KG_DBGOUT( std::cout << "low num contours" );
         }
         
         //update the cluster centers
@@ -212,30 +219,37 @@ void  KMeansClustering<T, TTraits>::doIt(
     assert(clusterAssignments.size() == items.size());
 }
 
+
+
+
 template<typename T, typename TTraits>
 void KMeansClustering<T, TTraits>::initialClusterAssignment(
 ) {
-    
-    std::set<T, std::less<T> > itemsSoFarSelectedForInitialization;
-    //select up to k non-unique items
-    for(int m=0; m < k; ++m) {
-        int whichItem;
-        while(true) {
-            float r = 1;
-            while(r >= 1.0f) {
-                r = Kg::uRand0To1();
-            }
-            int prospectiveItemIndex =  floor(r * items.size());
-            assert( prospectiveItemIndex < items.size());
-            if( itemsSoFarSelectedForInitialization.end() == itemsSoFarSelectedForInitialization.find(items[ prospectiveItemIndex ]) ) {
-                whichItem = prospectiveItemIndex;
-                itemsSoFarSelectedForInitialization.insert(items[prospectiveItemIndex]);
-                break;
-            }
+    if(userSpecifiedInit.size() == k) {
+        for(int m=0; m < k; ++m) {
+            clusterCenters[m] = userSpecifiedInit[m];
         }
-        clusterCenters[m] = items[whichItem];
+    } else {
+        std::set<T, std::less<T> > itemsSoFarSelectedForInitialization;
+        //select up to k non-unique items
+        for(int m=0; m < k; ++m) {
+            int whichItem;
+            while(true) {
+                float r = 1;
+                while(r >= 1.0f) {
+                    r = Kg::uRand0To1();
+                }
+                int prospectiveItemIndex =  floor(r * items.size());
+                assert( prospectiveItemIndex < items.size());
+                if( itemsSoFarSelectedForInitialization.end() == itemsSoFarSelectedForInitialization.find(items[ prospectiveItemIndex ]) ) {
+                    whichItem = prospectiveItemIndex;
+                    itemsSoFarSelectedForInitialization.insert(items[prospectiveItemIndex]);
+                    break;
+                }
+            }
+            clusterCenters[m] = items[whichItem];
+        }
     }
-    
     //do an initial cluster assignment of items
     lastSSEForAllItems = doClusterAssignmentForAllItems(
                                                         items,
@@ -243,6 +257,31 @@ void KMeansClustering<T, TTraits>::initialClusterAssignment(
                                                         clusterAssignments,
                                                         squaredErrorForItems
                                                         );
+}
+
+template<typename T, typename TTraits>
+void KMeansClustering<T, TTraits>::statsInitialClusterAssignment(
+) {
+    float minDistanceBetweenCentersSoFar = std::numeric_limits<float>::max();
+    float maxDistanceBetweenCentersSoFar = -std::numeric_limits<float>::max();
+    float sumDistanceBetweenCenters = 0.0;
+    int numPairs = k*(k-1)/2;
+    for(int m=0; m < k ; ++m ) {
+        const T & center = clusterCenters[m];
+        for(int n=m+1; n < k; ++n) {
+            const T & otherCenter = clusterCenters[n];
+            float curDistanceanceBetweenTwoCenters = TTraits::dist(center, otherCenter);
+            minDistanceBetweenCentersSoFar = Kg::min( minDistanceBetweenCentersSoFar, curDistanceanceBetweenTwoCenters  );
+            maxDistanceBetweenCentersSoFar = Kg::max( maxDistanceBetweenCentersSoFar, curDistanceanceBetweenTwoCenters  );
+            sumDistanceBetweenCenters += curDistanceanceBetweenTwoCenters;
+        }
+    }
+    float avgDistanceBetweenCenters = sumDistanceBetweenCenters  / numPairs;
+
+    std::cout << "inititalization statistics: " << std::endl;
+    std::cout << "minDistanceBetweenCenters: " << minDistanceBetweenCentersSoFar << std::endl;
+    std::cout << "maxDistanceBetweenCenters: " << maxDistanceBetweenCentersSoFar << std::endl;
+    std::cout << "avgDistanceBetweenCenters: " << avgDistanceBetweenCenters << std::endl;
 }
 
 template<typename T, typename TTraits>
@@ -272,11 +311,17 @@ float KMeansClustering<T, TTraits>::doClusterAssignmentForAllItems(
         squaredErrorForItems[j] = minDistSoFar;
         curSSEForAllItems += minDistSoFar;
     }
+
+    //verification that each valid contour is assigned to a cluster
+    for(int j =0; j < clusterAssignment.size(); ++j) {
+        assert(clusterAssignment[j] >= 0);
+    }
+
     return curSSEForAllItems;
 }
 
 template<typename T, typename TTraits>
-float KMeansClustering<T, TTraits>::resolveEmptyClusters(
+void KMeansClustering<T, TTraits>::resolveEmptyClusters(
                                                          std::vector<int> &numItemsInCluster,
                                                          std::vector<int> &clusterAssignments,
                                                          std::vector<T>   &clusterCentersBackBuffer,
