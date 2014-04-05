@@ -76,33 +76,47 @@ public:
         return numItemsInCluster;
     }
 protected:
+    //given the cluster centers,
+    //find the cluster center which is closest to each item
     static float doClusterAssignmentForAllItems(
-                                                     const std::vector<T> &items,
-                                                     const std::vector<T> &clusterCenters,
-                                                     std::vector<int> &clusterAssignment,
-                                                     std::deque<float> &squaredErrorForItems
-                                                     );
-    //resolve upto 4 empty clusters
+                                                const std::vector<T> &items,
+                                                const std::vector<T> &clusterCenters,
+                                                std::vector<int> &clusterAssignment,
+                                                std::deque<float> &squaredErrorForItems
+                                                );
+    //during each iteration,
+    //if we end up with some curent clusers with no members,
+    //then call this to do a redistribution
     static float resolveEmptyClusters(
-        std::vector<int> &numItemsInCluster,
-        std::vector<int> &clusterAssignments,
-        std::vector<T>   &clusterCentersBackBuffer,
-        const std::vector<T>   &items,
-        const std::deque<float> &squaredErrorForItems,
-        int desiredNumClusters
-    );
-    
+                                      std::vector<int> &numItemsInCluster,
+                                      std::vector<int> &clusterAssignments,
+                                      std::vector<T>   &clusterCentersBackBuffer,
+                                      const std::vector<T>   &items,
+                                      const std::deque<float> &squaredErrorForItems,
+                                      int desiredNumClusters
+                                      );
+    //randomly assign one item as a
+    //cluster center
     void initialClusterAssignment();
 protected:
+    //input items
     const std::vector<T> &items;
+    //k in kMeans
     int k;
+    //output cluster assignments
     std::vector<int> clusterAssignments;
+    
+    
+    //transient members
+    //current centroids
     std::vector<T> clusterCenters;
+    //current centroids back-buffer
     std::vector<T> clusterCentersBackBuffer;
+    //current number of items in each cluster
     std::vector<int> numItemsInCluster;
-    //squared error for each item from current cluster assignment
+    //currrent squared error for each item from current cluster assignment
     std::deque<float> squaredErrorForItems;
-    //total for all items
+    //last sum of squared error for all items
     float lastSSEForAllItems;
     
 protected:
@@ -133,9 +147,9 @@ void  KMeansClustering<T, TTraits>::doIt(
 ) {
     const int maxIterations = 100;
     const size_t nItems = items.size();
-
+    
     std::set<T, std::less<T> > contoursSoFarSelectedForInit2;
-
+    
     //if number of input samples < k
     //return
     if(items.size() <= k) {
@@ -144,48 +158,54 @@ void  KMeansClustering<T, TTraits>::doIt(
         }
         return;
     }
-    
+
+    //initialization
     initialClusterAssignment();
     
     
     float deltaError = lastSSEForAllItems;
     int emptyClusterIndices[4];
-
+    
     for(int i =0; i < maxIterations && deltaError > 10.0 ; ++i) {
         
         float curSSEForAllItems = 0;
-        
+        //initialize some transient variables per iteration
         numItemsInCluster.assign(k, 0);
         for(int m=0; m < k; ++m){
             clusterCentersBackBuffer[m] = T();
         }
         
+        //update the cluster centers
+        //use clusterCenterBackBuffer to do the calculation
         for(int j=0; j < nItems; ++j) {
             clusterCentersBackBuffer[clusterAssignments[j]] = clusterCentersBackBuffer[clusterAssignments[j]] +  TTraits::getContribution(items[j]);
             numItemsInCluster[clusterAssignments[j]] += TTraits::getContributingNumber(items[j]);
         }
-
         resolveEmptyClusters(
-                numItemsInCluster,
-                clusterAssignments,
-                clusterCentersBackBuffer,
-                items,
-                squaredErrorForItems,k);
-
-
+                             numItemsInCluster,
+                             clusterAssignments,
+                             clusterCentersBackBuffer,
+                             items,
+                             squaredErrorForItems,k);
         for(int m=0; m < k; ++m) {
             //all clusters should be non-empty
             assert(numItemsInCluster[m] > 0);
             clusterCentersBackBuffer[m] = clusterCentersBackBuffer[m] *  (1.0f/(float)numItemsInCluster[m]);
         }
         
+        
+        
+        //switch back buffer to front buffer
         clusterCenters.swap(clusterCentersBackBuffer);
+        
+        //re-assign items to clusters
         curSSEForAllItems = doClusterAssignmentForAllItems(
-                                                                items,
-                                                                clusterCenters,
-                                                                clusterAssignments,
-                                                                squaredErrorForItems
-                                                                );
+                                                           items,
+                                                           clusterCenters,
+                                                           clusterAssignments,
+                                                           squaredErrorForItems
+                                                           );
+        //keep track of error
         deltaError = lastSSEForAllItems - curSSEForAllItems;
         lastSSEForAllItems = curSSEForAllItems;
     }
@@ -194,9 +214,10 @@ void  KMeansClustering<T, TTraits>::doIt(
 
 template<typename T, typename TTraits>
 void KMeansClustering<T, TTraits>::initialClusterAssignment(
-                                                            ) {
+) {
     
     std::set<T, std::less<T> > itemsSoFarSelectedForInitialization;
+    //select up to k non-unique items
     for(int m=0; m < k; ++m) {
         int whichItem;
         while(true) {
@@ -215,20 +236,22 @@ void KMeansClustering<T, TTraits>::initialClusterAssignment(
         clusterCenters[m] = items[whichItem];
     }
     
+    //do an initial cluster assignment of items
     lastSSEForAllItems = doClusterAssignmentForAllItems(
-                                                             items,
-                                                             clusterCenters,
-                                                             clusterAssignments,
-                                                             squaredErrorForItems
-                                                             );
+                                                        items,
+                                                        clusterCenters,
+                                                        clusterAssignments,
+                                                        squaredErrorForItems
+                                                        );
 }
+
 template<typename T, typename TTraits>
 float KMeansClustering<T, TTraits>::doClusterAssignmentForAllItems(
-                                                                        const std::vector<T> &items,
-                                                                        const std::vector<T> &clusterCenters,
-                                                                        std::vector<int> &clusterAssignment,
-                                                                        std::deque<float> &squaredErrorForItems
-                                                                        ) {
+                                                                   const std::vector<T> &items,
+                                                                   const std::vector<T> &clusterCenters,
+                                                                   std::vector<int> &clusterAssignment,
+                                                                   std::deque<float> &squaredErrorForItems
+                                                                   ) {
     const size_t nItems = items.size();
     const size_t k = clusterCenters.size();
     float curSSEForAllItems = 0.0f;
@@ -254,52 +277,52 @@ float KMeansClustering<T, TTraits>::doClusterAssignmentForAllItems(
 
 template<typename T, typename TTraits>
 float KMeansClustering<T, TTraits>::resolveEmptyClusters(
-    std::vector<int> &numItemsInCluster,
-    std::vector<int> &clusterAssignments,
-    std::vector<T>   &clusterCentersBackBuffer,
-    const std::vector<T>   &items,
-    const std::deque<float> &squaredErrorForItems,
-    int desiredNumClusters
-) {
-        static int emptyClusterIndices[4];
-        const int nItems = items.size();
-        //resolve upto 4 empty  clusters
-        int nextEmptyClusterIndexIndex = 0;
-        emptyClusterIndices[0] = emptyClusterIndices[1] = emptyClusterIndices[2] = emptyClusterIndices[3] = -1;
-        for(int m=0; m < desiredNumClusters; ++m) {
-            if(numItemsInCluster[m] <= 0 && nextEmptyClusterIndexIndex < 4 ) {
-                emptyClusterIndices[nextEmptyClusterIndexIndex++] = m;
-            }
+                                                         std::vector<int> &numItemsInCluster,
+                                                         std::vector<int> &clusterAssignments,
+                                                         std::vector<T>   &clusterCentersBackBuffer,
+                                                         const std::vector<T>   &items,
+                                                         const std::deque<float> &squaredErrorForItems,
+                                                         int desiredNumClusters
+                                                         ) {
+    static int emptyClusterIndices[4];
+    const int nItems = items.size();
+    //resolve upto 4 empty  clusters
+    int nextEmptyClusterIndexIndex = 0;
+    emptyClusterIndices[0] = emptyClusterIndices[1] = emptyClusterIndices[2] = emptyClusterIndices[3] = -1;
+    for(int m=0; m < desiredNumClusters; ++m) {
+        if(numItemsInCluster[m] <= 0 && nextEmptyClusterIndexIndex < 4 ) {
+            emptyClusterIndices[nextEmptyClusterIndexIndex++] = m;
         }
-
-        std::set<SquaredErrorAndItemIndex> orderedErrorsForItems;
-        int numEmptyClusters = nextEmptyClusterIndexIndex;
-        if( numEmptyClusters > 0 ) {
-            for(int j=0; j < nItems; ++j) {
-                SquaredErrorAndItemIndex e(squaredErrorForItems[j], j);
-                orderedErrorsForItems.insert(e);
-            }
-            for(int j=0; j < numEmptyClusters; ++j) {
-                assert(emptyClusterIndices[j] >= 0);
-            }
+    }
+    
+    std::set<SquaredErrorAndItemIndex> orderedErrorsForItems;
+    int numEmptyClusters = nextEmptyClusterIndexIndex;
+    if( numEmptyClusters > 0 ) {
+        for(int j=0; j < nItems; ++j) {
+            SquaredErrorAndItemIndex e(squaredErrorForItems[j], j);
+            orderedErrorsForItems.insert(e);
         }
         for(int j=0; j < numEmptyClusters; ++j) {
             assert(emptyClusterIndices[j] >= 0);
-            while(orderedErrorsForItems.size() > 0) {
-                //maximum error entry
-                auto eit  = orderedErrorsForItems.begin();
-                int replacementClusterItemIndex =  eit->i_;
-                int currentClusterAssignmentOfReplacementItem = clusterAssignments[replacementClusterItemIndex ];
-                if(numItemsInCluster[ currentClusterAssignmentOfReplacementItem] > 1 ) {
-                    clusterCentersBackBuffer[ currentClusterAssignmentOfReplacementItem ] - items[replacementClusterItemIndex];
-                    numItemsInCluster[ currentClusterAssignmentOfReplacementItem ] -= 1;
-                    clusterCentersBackBuffer[emptyClusterIndices[j]] = items[replacementClusterItemIndex];
-                    numItemsInCluster[emptyClusterIndices[j]] = 1;
-                } else {
-                    orderedErrorsForItems.erase(eit);
-                }
+        }
+    }
+    for(int j=0; j < numEmptyClusters; ++j) {
+        assert(emptyClusterIndices[j] >= 0);
+        while(orderedErrorsForItems.size() > 0) {
+            //maximum error entry
+            auto eit  = orderedErrorsForItems.begin();
+            int replacementClusterItemIndex =  eit->i_;
+            int currentClusterAssignmentOfReplacementItem = clusterAssignments[replacementClusterItemIndex ];
+            if(numItemsInCluster[ currentClusterAssignmentOfReplacementItem] > 1 ) {
+                clusterCentersBackBuffer[ currentClusterAssignmentOfReplacementItem ] - items[replacementClusterItemIndex];
+                numItemsInCluster[ currentClusterAssignmentOfReplacementItem ] -= 1;
+                clusterCentersBackBuffer[emptyClusterIndices[j]] = items[replacementClusterItemIndex];
+                numItemsInCluster[emptyClusterIndices[j]] = 1;
+            } else {
+                orderedErrorsForItems.erase(eit);
             }
         }
+    }
 }
 
 #endif //K_MEANS_CLUSTERING_H_

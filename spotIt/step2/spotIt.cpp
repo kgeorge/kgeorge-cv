@@ -47,10 +47,9 @@ bool SpotIt::processCircle(
     Mat tempImage = inputImage(Rect(roiOrigin.x, roiOrigin.y, adjustedRoiWidth, adjustedRoiHeight));
     
     
-    //inout image processing
+    //input image processing
     
     Mat  roiGrayImage, roiHsvImage;
-    //copy to
     blur(tempImage, tempImage, cv::Size(3,3));
     cvtColor(tempImage, roiGrayImage, CV_BGR2GRAY);
     cvtColor(tempImage, roiHsvImage, CV_BGR2HSV);
@@ -203,7 +202,8 @@ void SpotIt::drawOutput(
 //We represent each contour by a representative point (ContourRepPoint) and
 //cluster the representative points of all the valid clusters.
 //We choose the centroid of all the points in a contour as the representative point.
-
+//ContourRepresentativePoint is an intermediate representation of a contour which
+//captures the above statement.
 
 struct ContourRepresentativePoint {
     Point2f meanPoint;
@@ -212,6 +212,8 @@ struct ContourRepresentativePoint {
     cv::Scalar hsvColor;
     cv::Scalar hsvVariance;
     ContourRepresentativePoint():nPointsInContour(0),hsvVariance(0){}
+    //when you add two ContourRepresentativePoint,
+    //change the mean and variance of the result accordingly
     ContourRepresentativePoint & operator +(const ContourRepresentativePoint & rhs) {
         //common reciprocal term
         float reciprocal = 1.0f/( nPointsInContour + rhs. nPointsInContour);
@@ -225,15 +227,15 @@ struct ContourRepresentativePoint {
         temp *=  rhs.nPointsInContour;
         newHsvColor += temp;
         newHsvColor *= reciprocal;
-
-
+        
+        
         //calculating  new variance
         Point2f tempPoint = variance + Point2f(meanPoint.x* meanPoint.x, meanPoint.y * meanPoint.y);
         tempPoint *= (float)(nPointsInContour);
         Point2f tempPointRhs = rhs.variance + Point2f( rhs.meanPoint.x * rhs.meanPoint.x, rhs.meanPoint.y * rhs.meanPoint.y);
         tempPointRhs *= (float)(rhs.nPointsInContour);
         variance = (tempPoint + tempPointRhs) * reciprocal - Point2f(newMeanPoint.x * newMeanPoint.x, newMeanPoint.y * newMeanPoint.y);
-
+        
         Scalar tempVar = hsvVariance + Scalar(hsvColor[0] * hsvColor[0],  hsvColor[1] * hsvColor[1], hsvColor[2] * hsvColor[2], hsvColor[3] * hsvColor[3] );
         tempVar *= (float)(nPointsInContour);
         Scalar tempVarRhs = rhs.hsvVariance + Scalar(rhs.hsvColor[0] * rhs.hsvColor[0],  rhs.hsvColor[1] * rhs.hsvColor[1], rhs.hsvColor[2] * rhs.hsvColor[2], rhs.hsvColor[3] * rhs.hsvColor[3] );
@@ -241,7 +243,7 @@ struct ContourRepresentativePoint {
         hsvVariance = (tempVar + tempVarRhs);
         hsvVariance *= reciprocal;
         hsvVariance -= Scalar( newHsvColor[0] * newHsvColor[0], newHsvColor[1] * newHsvColor[1], newHsvColor[2] * newHsvColor[2], newHsvColor[3] * newHsvColor[3]);
-
+        
         hsvColor = newHsvColor;
         meanPoint = newMeanPoint;
         nPointsInContour += rhs.nPointsInContour;
@@ -270,15 +272,15 @@ struct ContourRepresentativePoint {
         hsvVariance = sumSqColor;
         hsvVariance *= (1.0f/contour.size());
         hsvVariance -= Scalar(
-            hsvColor[0] * hsvColor[0],
-            hsvColor[1] * hsvColor[1],
-            hsvColor[2] * hsvColor[2],
-            hsvColor[3] * hsvColor[3]);
+                              hsvColor[0] * hsvColor[0],
+                              hsvColor[1] * hsvColor[1],
+                              hsvColor[2] * hsvColor[2],
+                              hsvColor[3] * hsvColor[3]);
         hsvVariance[1] = hsvVariance[2] = hsvVariance[3] = 1.0f;
         nPointsInContour = contour.size();
     }
-
-
+    
+    //meanNormalization, x = (x - mu)/sd, where mu = mean, sd = standard deviation
     template<typename Iter>
     static void meanNormalization(Iter b, Iter e) {
         ContourRepresentativePoint cpAvg;
@@ -304,7 +306,7 @@ struct ContourRepresentativePoint {
 
 struct ClusterItem {
     float data_[4];
-
+    
     ClusterItem(){
         data_[0] = data_[1] = data_[2] = data_[3] = 0;
     }
@@ -322,14 +324,14 @@ struct ClusterItem {
         return *this;
     }
     ClusterItem &operator+(const ClusterItem &rhs) {
-
+        
         data_[0] += rhs.data_[0];
         data_[1] += rhs.data_[1];
         data_[2] += rhs.data_[2];
         data_[3] += rhs.data_[3];
         return *this;
     }
-
+    
     ClusterItem &operator*(float scale) {
         data_[0] *= scale;
         data_[1] *= scale;
@@ -337,7 +339,7 @@ struct ClusterItem {
         data_[3] += scale;
         return *this;
     }
-
+    
     ClusterItem &operator-(const ClusterItem &rhs) {
         data_[0] -= rhs.data_[0];
         data_[1] -= rhs.data_[1];
@@ -345,13 +347,13 @@ struct ClusterItem {
         data_[3] -= rhs.data_[3];
         return *this;
     }
-
+    
     //last weignt item is the sum of all other weights
     friend float dot(const ClusterItem &lhs, const ClusterItem &rhs , const float weights[]) {
         return (weights[0] * lhs.data_[0] * rhs.data_[0] +  weights[1] * lhs.data_[1] * rhs.data_[1] +  weights[2] * lhs.data_[2] * rhs.data_[2] + weights[3] * lhs.data_[3] * rhs.data_[3])/weights[4];
     }
-
-
+    
+    
 };
 
 
@@ -359,28 +361,28 @@ template<>
 struct KMeansDataElementTraits<ClusterItem>{
     typedef ClusterItem T;
     const static float weights[];// = {1,1,9,0,11};
-
+    
     static float getMinDist(float minDist, const T &c) {
         return minDist;
     }
-
+    
     static T& getContribution( T &c) {
         return c;
     }
-
+    
     static const T& getContribution( const T &c) {
         return c;
     }
-
+    
     static int getContributingNumber( const T &c) {
         return 1;
     }
-
-
+    
+    
     static  bool validate( const T &c) {
         return true;
     }
-
+    
     static float dist(const T &lhs, const T &rhs) {
         T tDiff(lhs);
         tDiff - rhs;
@@ -388,32 +390,32 @@ struct KMeansDataElementTraits<ClusterItem>{
     }
 };
 
-    //weights for calculating distance between clusterItem components.
-    //x position weight = 1
-    //y position weignt = 1
-    //hue value weight = 9
-    //unused component weight = 0
-    //sum of all weights = 11
-    const float KMeansDataElementTraits<ClusterItem>::weights[] = {1,1,9,0,11};
+//weights for calculating distance between clusterItem components.
+//x position weight = 1
+//y position weignt = 1
+//hue value weight = 9
+//unused component weight = 0
+//sum of all weights = 11
+const float KMeansDataElementTraits<ClusterItem>::weights[] = {1,1,9,0,11};
 
 
-//order the element according to the hue color
+//order the element
 template<>
 struct std::less<ClusterItem> : std::binary_function<ClusterItem, ClusterItem, bool> {
     bool operator()(const ClusterItem &l, const ClusterItem &r) {
         bool b = (l.data_[0]< r.data_[0] ) ? true: ( (l.data_[0] > r.data_[0] ) ? false: (
-            (l.data_[1]< r.data_[1] ) ? true: ( (l.data_[1] > r.data_[1] ) ? false: (
-                    (l.data_[2]< r.data_[2] ) ? true: ( (l.data_[2] > r.data_[2] ) ? false: (
-                            (l.data_[3]< r.data_[3]) ? true : ( (l.data_[3] > r.data_[3] ) ? false: false
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-        );
+                                                                                          (l.data_[1]< r.data_[1] ) ? true: ( (l.data_[1] > r.data_[1] ) ? false: (
+                                                                                                                                                                   (l.data_[2]< r.data_[2] ) ? true: ( (l.data_[2] > r.data_[2] ) ? false: (
+                                                                                                                                                                                                                                            (l.data_[3]< r.data_[3]) ? true : ( (l.data_[3] > r.data_[3] ) ? false: false
+                                                                                                                                                                                                                                                                               )
+                                                                                                                                                                                                                                            )
+                                                                                                                                                                                                      )
+                                                                                                                                                                   )
+                                                                                                                             )
+                                                                                          )
+                                                    );
         return b;
-
+        
     }
 };
 
@@ -434,9 +436,10 @@ void SpotIt::cluster(
             indexReMapping[numGoodContours++] = i;
         }
     }
-
+    
+    //get  an intermediate representation
     vector<ContourRepresentativePoint> contourRepPoints(numGoodContours);
-
+    
     for(int j=0; j < contourRepPoints.size(); ++j) {
         map<int, int>::const_iterator mit = indexReMapping.find(j);
         assert(mit != indexReMapping.end());
@@ -444,9 +447,10 @@ void SpotIt::cluster(
         ContourRepresentativePoint &cRepPoint = contourRepPoints[j];
         cRepPoint.initializeFromContour(contours[indexInContours], roiHueComponentImage);
     }
-
-
+    //do meanNormalization
     ContourRepresentativePoint::meanNormalization< vector<ContourRepresentativePoint>::iterator >(contourRepPoints.begin(), contourRepPoints.end());
+    
+    //marshall the intermediate representation to clusterItems
     vector<ClusterItem> clusterItems(numGoodContours);
     for(int i=0; i < numGoodContours; ++i) {
         ClusterItem &ci = clusterItems[i];
@@ -455,24 +459,26 @@ void SpotIt::cluster(
         ci.data_[1] = cp.meanPoint.y;
         ci.data_[2] = cp.hsvColor[0];
     }
-
-
+    
+    
     //desired number of clusters
     int desiredK=9;
     KMeansClustering<ClusterItem> cluster(desiredK, clusterItems);
+    //clustering
     cluster.doIt();
     
+    //gather output
     sse = cluster.getOutputLastSSEForAllItems();
     const vector<int> &outputClusterAssignments = cluster.getOutputClusterAssignments();
     clusterAssignments.assign(contours.size(), -1);
-
+    
     for(int j=0; j < outputClusterAssignments.size(); ++j) {
         map<int, int>::const_iterator mit = indexReMapping.find(j);
         assert(mit != indexReMapping.end());
         int indexInContours = mit->second;
         clusterAssignments[indexInContours] = outputClusterAssignments[j];
     }
-
+    
     numClusters = desiredK;
     
     

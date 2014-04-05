@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
             roiOutputImage.copyTo(roiOutputImageLast);
         }
         imshow("video", image);
-
+        
         strstream ss;
         
         ofstream myfile;
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
             case 'S':
                 //save the output image in current directory
                 imwrite("roiOutputImageLast.jpg", roiOutputImageLast );
-
+                
                 break;
             default:
                 break;
