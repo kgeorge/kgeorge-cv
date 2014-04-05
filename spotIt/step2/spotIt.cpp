@@ -53,6 +53,7 @@ bool SpotIt::processCircle(
     Mat  roiGrayImage, roiHsvImage;
     blur(tempImage, tempImage, cv::Size(3,3));
     cvtColor(tempImage, roiGrayImage, CV_BGR2GRAY);
+    blur(tempImage, tempImage, cv::Size(3,3));
     cvtColor(tempImage, roiHsvImage, CV_BGR2HSV);
     vector<Mat> roiHsvComponents;
     split(roiHsvImage, roiHsvComponents);
@@ -397,7 +398,7 @@ struct KMeansDataElementTraits<ClusterItem>{
 //hue value weight = 9
 //unused component weight = 0
 //sum of all weights = 11
-const float KMeansDataElementTraits<ClusterItem>::weights[] = {1,1,9,0,11};
+const float KMeansDataElementTraits<ClusterItem>::weights[] = {3,3,7,0,11};
 
 
 //order the element

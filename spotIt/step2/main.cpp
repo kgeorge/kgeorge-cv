@@ -64,10 +64,8 @@ int main(int argc, char **argv) {
                      );
         vector<int> numItemsInCluster;
         if(circles.size()>0) {
-            for(int i=0; i < circles.size(); ++i) {
-                KG_DBGOUT( cout << circles[i][2] << ", " );
-            }
-            KG_DBGOUT( cout << endl );
+            double startTime = getTickCount();
+
             //draw only the first circle
             //todo: this need be extended to detect two circular regions
             Point circleCenter(  round(circles[0][0])*2, round(circles[0][1])*2);
@@ -79,6 +77,9 @@ int main(int argc, char **argv) {
                                  roiOutputImage//output BGR image of processed region
                                  );
             roiOutputImage.copyTo(roiOutputImageLast);
+            double endTime = getTickCount();
+
+            cout << "frameRate: " <<  getTickFrequency()/(endTime - startTime) << endl;
         }
         imshow("video", image);
         
