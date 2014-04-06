@@ -84,25 +84,37 @@ bool SpotIt::processCircle(
         vector<Point> &contour = contours[i];
         //number of points in the contour that falls within the circle
         int numPointsInCircle = 0;
+
+        int sumDistSqFromCircle = 0;
+        int sumSqDistSqFromCircle =  0;
         for(int j=0; j < contour.size(); ++j) {
             Point pRelativeToCircleCenter = contour[j] - circleCenterInRoi;
             double distSqOfPointToCenter = pRelativeToCircleCenter.x * pRelativeToCircleCenter.x  + pRelativeToCircleCenter.y  * pRelativeToCircleCenter.y;
-            if( ( circleRadiusSq - distSqOfPointToCenter )  > 10 ) {
+            sumDistSqFromCircle += (circleRadiusSq - distSqOfPointToCenter);
+            sumSqDistSqFromCircle  += (circleRadiusSq - distSqOfPointToCenter) * (circleRadiusSq - distSqOfPointToCenter);
+            if( ( circleRadiusSq - distSqOfPointToCenter )  > 2000 ) {
                 ++numPointsInCircle;
             }
         }
+        double avgDistSqFromCircle = sumDistSqFromCircle /contour.size();
+        double varianceDistSqFromCircle = sumSqDistSqFromCircle /contour.size() - avgDistSqFromCircle * avgDistSqFromCircle;
         double percentageNumPointsInCircle = (double)numPointsInCircle * 100.0/ contour.size();
         //if 90% of pointsof contour falls within the circle,
         //then this is a contour that need be further processed
         if( percentageNumPointsInCircle > 90.0 ) {
+        //if( avgDistSqFromCircle > 1000.0 ) {
             assert(contour.size() > 0);
             shouldProcessContour[i] = true;
+
+            KG_DBGOUT( cout << "~~~~~~~~~~~~~~~~" << endl);
+            KG_DBGOUT( cout << "mu= " << avgDistSqFromCircle << ", rho=" << varianceDistSqFromCircle <<  endl);
             nContoursGood++;
         }
     }
     if(nContoursGood <= 0) {
         //if no contours were produced
         //return false
+        KG_DBGOUT( cout << "dropped frame: " << endl );
         return false;
     }
     
@@ -110,15 +122,19 @@ bool SpotIt::processCircle(
     int numClusters=0;
     vector<int> clusterAssignments;
     float sse = numeric_limits<float>::max();
+
+
+    vector<ContourRepresentativePoint> clusterCenters;
+
     cluster(
             roiHsvComponents[0], //hue component of roi
             contours,           //output from findContours
             shouldProcessContour, //flag whether each contour need be processed
-            clusterAssignments, //output cluster assignments
+            clusterAssignments, //output cluster assignments,
+            clusterCenters, //output cluster centers , used for drawing
             numClusters,  //number of clusters,
             sse //sum of squared error
             );
-    
     
     //draw the output onto the output images
     roiOutputImage.create(roiGrayImage.size(), inputImage.type() );
@@ -127,8 +143,10 @@ bool SpotIt::processCircle(
                contours,
                shouldProcessContour,
                clusterAssignments,
+               clusterCenters,
                inputImage,
-               roiOutputImage);
+               roiOutputImage,
+               sse);
     
     return true;
 }
@@ -136,14 +154,16 @@ bool SpotIt::processCircle(
 
 
 
-
+/*
 void SpotIt::drawOutput(
                         const vector<vector<Point>> &contours,
                         const vector<bool> &shouldProcessContour,
                         const vector<int> &clusterAssignments,
+                        const vector<ContourRepresentativePoint> &clusterCenters,
                         Mat &inputImage,
-                        Mat &roiOutputImage){
-    
+                        Mat &roiOutputImage,
+                        float sse){
+    static char sbuffer[1024];
     
     //make random colors for displaying
     static RNG rng1(12345), rng2(54321);
@@ -193,13 +213,79 @@ void SpotIt::drawOutput(
                      );
         
     }
-}
+    for(int i=0; i < clusterCenters.size(); ++i) {
 
+        Point clusterCenterImagePoint = Point(round(clusterCenters[i].meanPoint.x), round(clusterCenters[i].meanPoint.y));
+        circle(roiOutputImage, clusterCenterImagePoint , 4, colorMark[i], -1, 8);
+
+    }
+    sprintf(sbuffer, "sse. %f", sse);
+    putText(roiOutputImage, sbuffer, cvPoint(20,20),
+    FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(200,200,250), 1, CV_AA);
+}
+*/
 
 /********************************************************************************/
 //  Clustering of contour points
 //
 /********************************************************************************/
+
+
+
+
+struct ClusterItem {
+    float data_[4];
+
+    ClusterItem(){
+        data_[0] = data_[1] = data_[2] = data_[3] = 0;
+    }
+    ClusterItem(const ClusterItem &rhs) {
+        data_[0] = rhs.data_[0];
+        data_[1] = rhs.data_[1];
+        data_[2] = rhs.data_[2];
+        data_[3] = rhs.data_[3];
+    }
+    ClusterItem &operator=(const ClusterItem &rhs){
+        data_[0] = rhs.data_[0];
+        data_[1] = rhs.data_[1];
+        data_[2] = rhs.data_[2];
+        data_[3] = rhs.data_[3];
+        return *this;
+    }
+    ClusterItem &operator+(const ClusterItem &rhs) {
+
+        data_[0] += rhs.data_[0];
+        data_[1] += rhs.data_[1];
+        data_[2] += rhs.data_[2];
+        data_[3] += rhs.data_[3];
+        return *this;
+    }
+
+    ClusterItem &operator*(float scale) {
+        data_[0] *= scale;
+        data_[1] *= scale;
+        data_[2] += scale;
+        data_[3] += scale;
+        return *this;
+    }
+
+    ClusterItem &operator-(const ClusterItem &rhs) {
+        data_[0] -= rhs.data_[0];
+        data_[1] -= rhs.data_[1];
+        data_[2] -= rhs.data_[2];
+        data_[3] -= rhs.data_[3];
+        return *this;
+    }
+
+    //last weight item is the sum of all other weights
+    friend float dot(const ClusterItem &lhs, const ClusterItem &rhs , const float weights[]) {
+        //return (weights[0] * lhs.data_[0] * rhs.data_[0] +  weights[1] * lhs.data_[1] * rhs.data_[1] +  weights[2] * lhs.data_[2] * rhs.data_[2] + weights[3] * lhs.data_[3] * rhs.data_[3])/weights[4];
+        return (weights[0] * lhs.data_[0] * rhs.data_[0] +  weights[1] * lhs.data_[1] * rhs.data_[1] +  weights[2] * lhs.data_[2] * rhs.data_[2] )/weights[4];
+
+    }
+
+
+};
 
 //We represent each contour by a representative point (ContourRepPoint) and
 //cluster the representative points of all the valid clusters.
@@ -284,7 +370,7 @@ struct ContourRepresentativePoint {
     
     //meanNormalization, x = (x - mu)/sd, where mu = mean, sd = standard deviation
     template<typename Iter>
-    static void meanNormalization(Iter b, Iter e) {
+    static ContourRepresentativePoint meanNormalization(Iter b, Iter e) {
         ContourRepresentativePoint cpAvg;
         cpAvg = std::accumulate(b, e, cpAvg);
         while(b != e) {
@@ -302,61 +388,23 @@ struct ContourRepresentativePoint {
             cRepPoint.nPointsInContour = 1;
             ++b;
         }
+        return cpAvg;
+    }
+
+
+    static ContourRepresentativePoint translateBack( const ClusterItem &citem, const ContourRepresentativePoint &cpAvg) {
+        ContourRepresentativePoint cpSample(cpAvg);
+        cpSample.meanPoint.x = citem.data_[0] * sqrt(cpAvg.variance.x) + cpAvg.meanPoint.x;
+        cpSample.meanPoint.y = citem.data_[1] * sqrt(cpAvg.variance.y) + cpAvg.meanPoint.y;
+        cpSample.hsvColor[0] = citem.data_[1] * sqrt(cpAvg.hsvVariance[0]) + cpAvg.hsvColor[0];
+        cpSample.variance = Point2f(1,1);
+        cpSample.hsvVariance = Scalar(1,1,1,1);
+        cpSample.nPointsInContour = 1;
+        return cpSample;
     }
     
 };
 
-struct ClusterItem {
-    float data_[4];
-    
-    ClusterItem(){
-        data_[0] = data_[1] = data_[2] = data_[3] = 0;
-    }
-    ClusterItem(const ClusterItem &rhs) {
-        data_[0] = rhs.data_[0];
-        data_[1] = rhs.data_[1];
-        data_[2] = rhs.data_[2];
-        data_[3] = rhs.data_[3];
-    }
-    ClusterItem &operator=(const ClusterItem &rhs){
-        data_[0] = rhs.data_[0];
-        data_[1] = rhs.data_[1];
-        data_[2] = rhs.data_[2];
-        data_[3] = rhs.data_[3];
-        return *this;
-    }
-    ClusterItem &operator+(const ClusterItem &rhs) {
-        
-        data_[0] += rhs.data_[0];
-        data_[1] += rhs.data_[1];
-        data_[2] += rhs.data_[2];
-        data_[3] += rhs.data_[3];
-        return *this;
-    }
-    
-    ClusterItem &operator*(float scale) {
-        data_[0] *= scale;
-        data_[1] *= scale;
-        data_[2] += scale;
-        data_[3] += scale;
-        return *this;
-    }
-    
-    ClusterItem &operator-(const ClusterItem &rhs) {
-        data_[0] -= rhs.data_[0];
-        data_[1] -= rhs.data_[1];
-        data_[2] -= rhs.data_[2];
-        data_[3] -= rhs.data_[3];
-        return *this;
-    }
-    
-    //last weight item is the sum of all other weights
-    friend float dot(const ClusterItem &lhs, const ClusterItem &rhs , const float weights[]) {
-        return (weights[0] * lhs.data_[0] * rhs.data_[0] +  weights[1] * lhs.data_[1] * rhs.data_[1] +  weights[2] * lhs.data_[2] * rhs.data_[2] + weights[3] * lhs.data_[3] * rhs.data_[3])/weights[4];
-    }
-    
-    
-};
 
 
 template<>
@@ -442,7 +490,10 @@ struct InitComp : std::binary_function<T, T, bool> {
 
 bool SpotIt::customInitialClusterAssignment( int k,
                                             const vector<ClusterItem> &items,
-                                            vector<ClusterItem> &clusterCenters
+                                            const vector< vector< Point > > &contours,
+                                            const map<int, int> &indexReMapping,
+                                            vector<ClusterItem> &clusterCenters,
+                                            vector<int> &itemsSelected
 ) {
         clusterCenters.assign(k, ClusterItem());
 
@@ -472,7 +523,7 @@ bool SpotIt::customInitialClusterAssignment( int k,
             int maxIterations = 100;
             ClusterItem prospectiveItem;
             //our initialization should ideally produce clusterCenters which have a pairwise distance of 'minimumDistanceBetweenSelectedClusterCenters'
-            float minimumDistanceBetweenSelectedClusterCenters = 0.2f;
+            float minimumDistanceBetweenSelectedClusterCenters = 0.5f;
             bool foundMthClusterCenter = false;
             while ( !foundMthClusterCenter && (minimumDistanceBetweenSelectedClusterCenters /= 2.0f) > 0.0001) {
                 //if we cant find good initializations in 100 iterations
@@ -487,7 +538,15 @@ bool SpotIt::customInitialClusterAssignment( int k,
 
                         int prospectiveItemIndex =  floor(r * items.size());
                         assert( prospectiveItemIndex < items.size());
+                        map<int,int>::const_iterator mit = indexReMapping.find(prospectiveItemIndex);
+                        int contourIndex = mit->second;
+                        double contourLength = arcLength(contours[contourIndex], false);
+                        if(contourLength < 100) {
+                            continue;
+                        }
                         prospectiveItem = items[prospectiveItemIndex];
+                        itemsSelected.push_back(prospectiveItemIndex);
+
                     } else {
                         //if the first 25 iterations doesnt yield k clusterCenters which are seperated by 'minimumDistanceBetweenSelectedClusterCenters'
                         //try randomization of the range
@@ -529,6 +588,7 @@ void SpotIt::cluster(
                      const vector< vector< Point > > &contours,
                      const  vector<bool> &shouldProcessContour,
                      vector<int> &clusterAssignments,
+                     vector<ContourRepresentativePoint> &clusterCenters,
                      int &numClusters,
                      float &sse) {
     
@@ -552,7 +612,7 @@ void SpotIt::cluster(
         cRepPoint.initializeFromContour(contours[indexInContours], roiHueComponentImage);
     }
     //do meanNormalization
-    ContourRepresentativePoint::meanNormalization< vector<ContourRepresentativePoint>::iterator >(contourRepPoints.begin(), contourRepPoints.end());
+    ContourRepresentativePoint cpAvg = ContourRepresentativePoint::meanNormalization< vector<ContourRepresentativePoint>::iterator >(contourRepPoints.begin(), contourRepPoints.end());
     
     //marshall the intermediate representation to clusterItems
     vector<ClusterItem> clusterItems(numGoodContours);
@@ -566,13 +626,27 @@ void SpotIt::cluster(
     
     
     //desired number of clusters
-    int desiredK=9;
+    int desiredK=8;
     
     
     //randomly initialize points from the image
     vector<ClusterItem> clusterCentersInitialization;
-    bool wasSuccessful = customInitialClusterAssignment( desiredK, clusterItems, clusterCentersInitialization);
+    vector<int> itemsSelected;
+    bool wasSuccessful = customInitialClusterAssignment(
+        desiredK,
+        clusterItems,
+        contours,
+        indexReMapping,
+        clusterCentersInitialization,
+        itemsSelected);
     KMeansClustering<ClusterItem> cluster(desiredK, clusterItems, clusterCentersInitialization);
+    KG_DBGOUT(cout << "#################" << endl);
+    for(int j=0; j < itemsSelected.size(); ++j) {
+        map<int, int>::const_iterator mit = indexReMapping.find(itemsSelected[j]);
+        int contourIdx = mit->second;
+        KG_DBGOUT(cout << contourIdx << ": " << arcLength(contours[contourIdx], false) << ", ");
+    }
+    KG_DBGOUT(cout << endl);
     //clustering
     cluster.doIt();
     
@@ -580,7 +654,13 @@ void SpotIt::cluster(
     sse = cluster.getOutputLastSSEForAllItems();
     const vector<int> &outputClusterAssignments = cluster.getOutputClusterAssignments();
     clusterAssignments.assign(contours.size(), -1);
-    
+
+    const vector<ClusterItem> &citems = cluster.getClusterCenters();
+    clusterCenters.assign(citems.size(), ContourRepresentativePoint());
+    for(int i=0; i < citems.size(); ++i) {
+       clusterCenters[i] =  ContourRepresentativePoint::translateBack( citems[i], cpAvg);
+    }
+
     for(int j=0; j < outputClusterAssignments.size(); ++j) {
         map<int, int>::const_iterator mit = indexReMapping.find(j);
         assert(mit != indexReMapping.end());
@@ -589,4 +669,74 @@ void SpotIt::cluster(
     }
     
     numClusters = desiredK;
+}
+
+
+void SpotIt::drawOutput(
+                        const vector<vector<Point>> &contours,
+                        const vector<bool> &shouldProcessContour,
+                        const vector<int> &clusterAssignments,
+                        const vector<ContourRepresentativePoint> &clusterCenters,
+                        Mat &inputImage,
+                        Mat &roiOutputImage,
+                        float sse){
+    static char sbuffer[1024];
+
+    //make random colors for displaying
+    static RNG rng1(12345), rng2(54321);
+    static const Scalar colorMark[] = {
+        Scalar(255, 255, 255),
+        Scalar(255, 0, 0),
+        Scalar(0, 255, 0),
+        Scalar(0, 0, 255),
+        Scalar(255, 255, 0),
+        Scalar(255, 0, 255),
+        Scalar(0, 255, 255),
+        Scalar( rng1.uniform(128, 255), rng1.uniform(128,255), rng1.uniform(128,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(128,255) ),
+        Scalar( rng1.uniform(128, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(128,255), rng1.uniform(128,255) ),
+        Scalar( rng1.uniform(60, 255), rng1.uniform(60,255), rng1.uniform(60,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
+        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) )
+
+    };
+
+    for(int i=0; i < contours.size(); ++i) {
+        if(!shouldProcessContour[i]) {
+            continue;
+        }
+
+        int iColorIdx = clusterAssignments[i];
+        drawContours(
+                     roiOutputImage,
+                     contours,
+                     i,
+                     colorMark[iColorIdx]
+                     );
+        drawContours(
+                     inputImage,
+                     contours,
+                     i,
+                     colorMark[iColorIdx]
+                     );
+
+    }
+    for(int i=0; i < clusterCenters.size(); ++i) {
+
+        Point clusterCenterImagePoint = Point(round(clusterCenters[i].meanPoint.x), round(clusterCenters[i].meanPoint.y));
+        circle(roiOutputImage, clusterCenterImagePoint , 4, colorMark[i], -1, 8);
+
+    }
+    sprintf(sbuffer, "sse. %f", sse);
+    putText(roiOutputImage, sbuffer, cvPoint(20,20),
+    FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(200,200,250), 1, CV_AA);
 }

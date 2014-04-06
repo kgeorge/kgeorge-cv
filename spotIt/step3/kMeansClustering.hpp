@@ -76,6 +76,9 @@ public:
     const std::vector<int> &getNumItemsInCluster() {
         return numItemsInCluster;
     }
+    const std::vector<T> &getClusterCenters() {
+        return clusterCenters;
+    }
 protected:
     //given the cluster centers,
     //find the cluster center which is closest to each item
@@ -225,6 +228,8 @@ void  KMeansClustering<T, TTraits>::doIt(
 template<typename T, typename TTraits>
 void KMeansClustering<T, TTraits>::initialClusterAssignment(
 ) {
+    //if the user has already specified an initialization
+    //then use that
     if(userSpecifiedInit.size() == k) {
         for(int m=0; m < k; ++m) {
             clusterCenters[m] = userSpecifiedInit[m];
