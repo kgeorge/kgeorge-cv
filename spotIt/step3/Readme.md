@@ -1,6 +1,6 @@
 
 
-## Feature detection challenge from [Silicon-Valley-Computer-Vision-Meetup](http://www.meetup.com/Silicon-Valley-Computer-Visionr)
+## Feature detection challenge from [Silicon-Valley-Computer-Vision-Meetup](http://www.meetup.com/Silicon-Valley-Computer-Vision)
 
 
 *
@@ -16,7 +16,7 @@ For each frame,
 - detects a single [spotIt](http://www.blueorangegames.com/index.php/games/spotit) circular card region. (using HoughCircle)
 
 
-- When pressed 'n' or 'N' proceeds to process the region of image neighboring to the circular region. (SpotIt::processCircle) SpotIt::processCircle produces a processed version of the output region of interest part of the image.
+- When pressed 'n' or 'N' proceeds to process the region of image within the  circular region. (SpotIt::processCircle) SpotIt::processCircle produces a processed version of the output region of interest part of the image.
 which can be saved in the current working directory as 'roiLastOutputImage.jpg'. The current processing of the roi is rudimental. It
 does some minimal clustering which need be improved.
 

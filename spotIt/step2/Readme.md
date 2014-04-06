@@ -1,6 +1,6 @@
 
 
-## Feature detection challenge from [Silicon-Valley-Computer-Vision-Meetup](http://www.meetup.com/Silicon-Valley-Computer-Visionr)
+## Feature detection challenge from [Silicon-Valley-Computer-Vision-Meetup](http://www.meetup.com/Silicon-Valley-Computer-Vision)
 
 
 *
