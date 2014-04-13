@@ -14,7 +14,7 @@
 #include <functional>
 #include <unordered_set>
 #include <set>
-
+#include <string>
 
 
 #if defined(DEBUG)
@@ -42,6 +42,32 @@ namespace Kg {
     T max( T a, T b ) {
         return a >= b ? a: b;
     }
+
+    //A utility class that collects float samples
+    //and keeps track of current, mean, variance and numSamples
+    struct StatsMaker {
+        float mean;
+        int n;
+        float variance;
+        StatsMaker(const std::string &name):name(name) {
+            mean = 0.0f, variance = 0.0f, n=0;
+        }
+        void addSample( float sample ) {
+            float reciprocal = 1.0f /(n + 1);
+            float newMean = (mean * n + sample) * reciprocal;
+            float sumSq = (variance +  mean * mean) * n + sample * sample;
+            variance = sumSq * reciprocal - (newMean * newMean);
+            mean = newMean;
+            n +=1;
+        }
+        std::string name;
+
+        friend std::ostream &operator<< (std::ostream &o, const StatsMaker &s) {
+            o << s.name << ": mu=" << s.mean << ": variance=" << s.variance <<  std::endl;
+            return o;
+
+        }
+    };
 }
 
 

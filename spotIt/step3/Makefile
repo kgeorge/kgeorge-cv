@@ -2,6 +2,7 @@
 
 #for building debug configuraion, call make by 'make DEBUG=1'
 DEBUG ?= 0
+GIT_ROOT=./../..
 ifeq ($(DEBUG), 1)
 	CONFIG=DEBUG
 	#
@@ -11,11 +12,16 @@ ifeq ($(DEBUG), 1)
 	FORGIVING-CXXFLAGS=-Wno-reorder -D DEBUG -g3
 	OPENCV-INCLUDES = /usr/local/include  $(OPENCV_DEBUG_INSTALL_DIR)/include
 	OPENCV-LIBS-DIR = $(OPENCV_DEBUG_INSTALL_DIR)/lib
+	# for now just use the release config
+	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/build/release
+	GTEST-INCLUDES = -I$(GIT_ROOT)/thirdparty/gtest-1.7.0/include
 else
 	CONFIG=RELEASE
 	FORGIVING-CXXFLAGS=-Wno-reorder  -D NDEBUG
 	OPENCV-INCLUDES = $(shell /usr/local/bin/pkg-config --cflags opencv)
 	OPENCV-LIBS-DIR = $(shell /usr/local/bin/pkg-config --libs opencv | dirname `awk '{ print $$1 }'`)
+	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/lib/release
+	GTEST-INCLUDES = -I$(GIT_ROOT)/thirdparty/gtest-1.7.0/include
 endif
 
 
@@ -41,6 +47,10 @@ OPENCV-LIBS=\
 	$(OPENCV-LIBS-DIR)/libopencv_videostab.dylib \
 	-F /System/Library/Frameworks   -framework OpenGL -framework AGL
 
+GTEST-LIBS=\
+	$(GTEST-LIBS-DIR)/libgtest.a \
+	$(GTEST-LIBS-DIR)/libgtest_main.a
+
 
 
 CXX=clang++
@@ -48,24 +58,39 @@ CXXFLAGS=-g -Wall -Wno-deprecated $(FORGIVING-CXXFLAGS) -std=c++11 -D WITH_OPENG
 LDFLAGS= $(OPENCV-LIBS)
 
 BUILD-DIR=build
-OBJS=$(addprefix $(BUILD-DIR)/, main.o spotIt.o)
+MAIN=$(addprefix $(BUILD-DIR)/, main.o )
+OBJS=$(addprefix $(BUILD-DIR)/, spotIt.o)
 PROG=$(BUILD-DIR)/spotIt
 
 
+TESTOBJS=$(addprefix $(BUILD-DIR)/test/, testMain.o)
+TESTPROG=$(BUILD-DIR)/testSpotIt
 
-all: $(PROG)
+all: $(PROG) $(TESTPROG)
 
 #order-only-prerequisites
 $(OBJS): | $(BUILD-DIR)
+#order-only-prerequisites
+$(TESTOBJS) : | $(BUILD-DIR)
 
-$(PROG): $(OBJS)
-	$(CXX) -v -o $(PROG) $(OBJS) $(LDFLAGS)
+$(PROG): $(OBJS) $(MAIN)
+	$(CXX) -v -o $(PROG) $(OBJS) $(MAIN) $(LDFLAGS)
+
+$(TESTPROG): $(TESTOBJS) $(PROG)
+	$(CXX) -v -o $(TESTPROG) $(OBJS) $(TESTOBJS) $(LDFLAGS) $(GTEST-LIBS)
+
 
 $(BUILD-DIR)/%.o: %.cpp
-	@echo compiling $(CONFIG) configuration
+	@echo compiling $(CONFIG)  configuration
+	# eg: $@ == build/spotIt.o $< == spotIt.cpp
 	$(CXX) -c $(CXXFLAGS) -o $@ $<
 
+$(BUILD-DIR)/test/%.o: test/%.cpp
+	@echo compiling $(CONFIG) configuration for test
+	$(CXX) -c $(CXXFLAGS) $(GTEST-INCLUDES) -o $@ $<
+
 $(BUILD-DIR):
-	mkdir -p $(BUILD-DIR)
+	mkdir -p $(BUILD-DIR)/test
+
 clean:
-	rm $(OBJS); rm $(PROG)
+	rm -rf build

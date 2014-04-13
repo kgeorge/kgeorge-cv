@@ -10,18 +10,29 @@
 #include <ctime>
 #include <cmath>
 #include <set>
+#include <vector>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <opencv2/video/background_segm.hpp>
+#include <opencv2/nonfree/nonfree.hpp>
 
 #include "spotIt.hpp"
 #include "kgUtils.hpp"
 #include "kMeansClustering.hpp"
+#include "kgGeometricHashing.hpp"
 
 using namespace std;
 using namespace cv;
+
+
+
+
+template<>
+const float Quantizer<float>::kEpsilon_ = 0.000001f;
+
+template<>
+const double Quantizer<double>::kEpsilon_ = 0.00000000001;
 
 
 bool SpotIt::processCircle(
@@ -41,8 +52,8 @@ bool SpotIt::processCircle(
     //roiOrigin
     Point roiOrigin(Kg::max(circleCenter.x - roiDim/2, 0) , Kg::max(circleCenter.y - roiDim/2, 0));
     //roi width, height
-    int adjustedRoiWidth = Kg::min( (int)roiDim  , inputImage.cols - roiOrigin.x);
-    int adjustedRoiHeight = Kg::min( (int)roiDim  , inputImage.rows - roiOrigin.y);
+    int adjustedRoiWidth = Kg::min( (int)roiDim  , static_cast<int>(inputImage.cols - roiOrigin.x));
+    int adjustedRoiHeight = Kg::min( (int)roiDim  , static_cast<int>(inputImage.rows - roiOrigin.y));
     Point circleCenterInRoi = circleCenter - roiOrigin;
     //reference to part of inputImage that covers roi
     Mat tempImage = inputImage(Rect(roiOrigin.x, roiOrigin.y, adjustedRoiWidth, adjustedRoiHeight));
@@ -136,94 +147,121 @@ bool SpotIt::processCircle(
             sse //sum of squared error
             );
     
+    map<int, int> numPointsForEachCluster;
+    for(int i=0; i < numClusters; ++i) {
+        numPointsForEachCluster[i] =0;
+    }
+    for(int i=0; i < contours.size(); ++i ) {
+        vector<Point> &contour = contours[i];
+        if( shouldProcessContour[i]) {
+            int clusterId = clusterAssignments[i];
+            assert(clusterId >= 0);
+            numPointsForEachCluster[clusterId] += contour.size();
+        }
+    }
+    
+    
+    vector<vector<Point2f>> approximatedContours(contours.size());
+    approximateCurves( contours, shouldProcessContour,  approximatedContours  );
     //draw the output onto the output images
     roiOutputImage.create(roiGrayImage.size(), inputImage.type() );
     roiOutputImage = Scalar(0,0,0);
+
+    vector<KeyPoint> keyPoints;
+    //extractFeaturesFromRoiOutput (roiGrayImage, keyPoints );
+
+    vector<vector<Point2f>> pointClusters(numClusters);
+    for(int i=0; i < numClusters; ++i) {
+        if(numPointsForEachCluster[i] > 0) {
+            pointClusters[i].reserve(numPointsForEachCluster[i]);
+        }
+    }
+    vector< vector<Point> > outContours(contours.size());
+    for(int i=0; i< contours.size(); ++i) {
+        if( shouldProcessContour[i] ) {
+            vector<Point2f> &approxContour = approximatedContours[i];
+            outContours[i].resize( approxContour.size());
+            int clusterId = clusterAssignments[i];
+            int numPointsInClusterSoFar = pointClusters[clusterId].size();
+            for(int j=0; j < approxContour.size(); ++j) {
+                outContours[i][j] = Point( round(approxContour[j].x), round(approxContour[j].y));
+                pointClusters[clusterId].push_back( approxContour[j] );
+            }
+        }
+    }
+    
     drawOutput(
-               contours,
+               outContours,
                shouldProcessContour,
                clusterAssignments,
                clusterCenters,
+               keyPoints,
                inputImage,
                roiOutputImage,
                sse);
     
+   
+    geometricHashBuilding( pointClusters);
+
     return true;
 }
 
 
+void SpotIt::geometricHashBuilding(
+    const vector<vector<Point2f> > & contours
+    )
+    {
+    //KgGeometricHashing<vector<Point2f>,  Quantizer<float>, KgGeometricHashing_Traits< vector<Point2f> > > geomHash(contours.begin(), contours.end());
+    KgGeometricHashing<vector<Point2f>,  Quantizer<float> >  geomHash(contours.begin(), contours.end());
+    geomHash.processTemplateSet(0.16f);
+    statsMakerMaxX.addSample(geomHash.maxValX);
+    statsMakerMaxY.addSample(geomHash.maxValY);
+    statsMakerMinX.addSample(geomHash.minValX);
+    statsMakerMinY.addSample(geomHash.minValY);
+    std::cout << "////////////////////" << std::endl;
+    std::cout << statsMakerMaxX;
+    std::cout << statsMakerMaxY;
+    std::cout << statsMakerMinX;
+    std::cout << statsMakerMinY;
 
-
-/*
-void SpotIt::drawOutput(
-                        const vector<vector<Point>> &contours,
-                        const vector<bool> &shouldProcessContour,
-                        const vector<int> &clusterAssignments,
-                        const vector<ContourRepresentativePoint> &clusterCenters,
-                        Mat &inputImage,
-                        Mat &roiOutputImage,
-                        float sse){
-    static char sbuffer[1024];
-    
-    //make random colors for displaying
-    static RNG rng1(12345), rng2(54321);
-    static const Scalar colorMark[] = {
-        Scalar(255, 255, 255),
-        Scalar(255, 0, 0),
-        Scalar(0, 255, 0),
-        Scalar(0, 0, 255),
-        Scalar(255, 255, 0),
-        Scalar(255, 0, 255),
-        Scalar(0, 255, 255),
-        Scalar( rng1.uniform(128, 255), rng1.uniform(128,255), rng1.uniform(128,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(128,255) ),
-        Scalar( rng1.uniform(128, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(128,255), rng1.uniform(128,255) ),
-        Scalar( rng1.uniform(60, 255), rng1.uniform(60,255), rng1.uniform(60,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) )
-        
-    };
-    
-    for(int i=0; i < contours.size(); ++i) {
-        if(!shouldProcessContour[i]) {
-            continue;
-        }
-        
-        int iColorIdx = clusterAssignments[i];
-        drawContours(
-                     roiOutputImage,
-                     contours,
-                     i,
-                     colorMark[iColorIdx]
-                     );
-        drawContours(
-                     inputImage,
-                     contours,
-                     i,
-                     colorMark[iColorIdx]
-                     );
-        
-    }
-    for(int i=0; i < clusterCenters.size(); ++i) {
-
-        Point clusterCenterImagePoint = Point(round(clusterCenters[i].meanPoint.x), round(clusterCenters[i].meanPoint.y));
-        circle(roiOutputImage, clusterCenterImagePoint , 4, colorMark[i], -1, 8);
-
-    }
-    sprintf(sbuffer, "sse. %f", sse);
-    putText(roiOutputImage, sbuffer, cvPoint(20,20),
-    FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(200,200,250), 1, CV_AA);
 }
-*/
+
+
+void SpotIt::extractFeaturesFromRoiOutput (Mat &roiImage, vector<KeyPoint> &keypoints ) {
+
+  Ptr<FeatureDetector> featureDetector = FeatureDetector::create("SIFT");
+
+  featureDetector->detect(roiImage, keypoints);
+
+}
+
+void SpotIt::approximateCurves(
+    const vector<vector<Point> > & inContours,
+    const std::vector<bool> &shouldProcessContour,
+    vector<vector<Point2f> > & outContours ) {
+    int numPointsBeforeSimplification = 0;
+    vector<Point> outContourInt;
+    for(int i=0; i < inContours.size(); ++i) {
+        numPointsBeforeSimplification += ( shouldProcessContour[i]) ? inContours[i].size() : 0;
+    }
+    for(int i=0; i< inContours.size(); ++i) {
+
+        if( shouldProcessContour[i]) {
+            vector<Point2f> &outContour = outContours[i];
+            outContourInt.clear();
+            approxPolyDP(Mat(inContours[i]), outContourInt, arcLength(inContours[i], false) * 0.003, false);
+            outContour.resize(outContourInt.size());
+            for(int j=0; j < outContourInt.size(); ++j) {
+                outContour[j] = Point2f( outContourInt[j].x, outContourInt[j].y );
+            }
+        }
+    }
+    int    numPointsAfterSimplification = 0;
+    for(int i=0; i < outContours.size(); ++i) {
+        numPointsAfterSimplification += ( shouldProcessContour[i]) ? outContours[i].size() : 0;
+    }
+    cout << "num points before: " << numPointsBeforeSimplification << ", after " << numPointsAfterSimplification << endl;
+}
 
 /********************************************************************************/
 //  Clustering of contour points
@@ -677,6 +715,7 @@ void SpotIt::drawOutput(
                         const vector<bool> &shouldProcessContour,
                         const vector<int> &clusterAssignments,
                         const vector<ContourRepresentativePoint> &clusterCenters,
+                        const vector<KeyPoint> &keyPoints,
                         Mat &inputImage,
                         Mat &roiOutputImage,
                         float sse){
@@ -685,7 +724,6 @@ void SpotIt::drawOutput(
     //make random colors for displaying
     static RNG rng1(12345), rng2(54321);
     static const Scalar colorMark[] = {
-        Scalar(255, 255, 255),
         Scalar(255, 0, 0),
         Scalar(0, 255, 0),
         Scalar(0, 0, 255),
@@ -736,6 +774,12 @@ void SpotIt::drawOutput(
         circle(roiOutputImage, clusterCenterImagePoint , 4, colorMark[i], -1, 8);
 
     }
+
+    Scalar featureColor(255, 255, 255);
+    drawKeypoints(roiOutputImage, keyPoints, roiOutputImage, featureColor, DrawMatchesFlags::DEFAULT);
+
+
+
     sprintf(sbuffer, "sse. %f", sse);
     putText(roiOutputImage, sbuffer, cvPoint(20,20),
     FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(200,200,250), 1, CV_AA);
