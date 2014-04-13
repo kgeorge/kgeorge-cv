@@ -80,14 +80,14 @@ $(TESTPROG): $(TESTOBJS) $(PROG)
 	$(CXX) -v -o $(TESTPROG) $(OBJS) $(TESTOBJS) $(LDFLAGS) $(GTEST-LIBS)
 
 
+$(BUILD-DIR)/test/%.o: test/%.cpp
+	@echo compiling $(CONFIG) configuration for test
+	$(CXX) -c $(CXXFLAGS) $(GTEST-INCLUDES) -o $@ $<
+
 $(BUILD-DIR)/%.o: %.cpp
 	@echo compiling $(CONFIG)  configuration
 	# eg: $@ == build/spotIt.o $< == spotIt.cpp
 	$(CXX) -c $(CXXFLAGS) -o $@ $<
-
-$(BUILD-DIR)/test/%.o: test/%.cpp
-	@echo compiling $(CONFIG) configuration for test
-	$(CXX) -c $(CXXFLAGS) $(GTEST-INCLUDES) -o $@ $<
 
 $(BUILD-DIR):
 	mkdir -p $(BUILD-DIR)/test

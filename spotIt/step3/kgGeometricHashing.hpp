@@ -54,12 +54,15 @@ struct AppropriateNonIntegralType<double> {
 template< typename TTemplate >
 struct KgGeometricHashing_Traits;
 
-template<typename T, int n >
+template<typename T, typename HashEntry, int n >
 struct Hash {
     typedef KgGeometricHashing_Traits<T> TTraits;
     typedef typename T::value_type I;
     typedef typename AppropriateNonIntegralType<I>::value_type K;
     Hash(K w):w(w),gen(42),dist(std::normal_distribution<>(0.0, 1)) {
+        throw std::runtime_error( "not implemented" );
+    }
+    void index( const T &arg, const HashEntry & entry) {
         throw std::runtime_error( "not implemented" );
     }
     std::normal_distribution<> dist;
@@ -224,7 +227,8 @@ public:
         queue_.clear();
     }
 
-    void processTemplateSet(K w);
+    template<typename HashEntry>
+    void processTemplateSet(K w, Hash<T, HashEntry, 3> &hash);
 
     K maxValX;
     K minValX;
@@ -244,9 +248,10 @@ protected:
 
 
 template< typename TTemplate, typename Q>
-void KgGeometricHashing<TTemplate, Q >::processTemplateSet(K w) {
+template<typename HashEntry>
+void KgGeometricHashing<TTemplate, Q >::processTemplateSet(K w, Hash<T, HashEntry, 3> &hash) {
     int hashResult[3];
-    Hash< T, 3> hash ( w );
+
     for(auto qit= queue_.begin(); qit != queue_.end(); ++qit) {
         const TTemplate *t = *qit;
         TemplateExtra_<TTemplate, TTraits> extra;
@@ -300,8 +305,8 @@ void KgGeometricHashing<TTemplate, Q >::processTemplateSet(K w) {
                         maxValY = (quantizer(projection.y) > maxValY) ? quantizer(projection.y) : maxValY;
                         minValX = (quantizer(projection.x) < minValX) ? quantizer(projection.x) : minValX;
                         minValY = (quantizer(projection.y) < minValY) ? quantizer(projection.y) : minValY;
-
-                        hash(projection, hashResult);
+                        HashEntry he(*pointIt, *nextPointIt);
+                        //hash.index(projection, he);
 
                     }
                 }
