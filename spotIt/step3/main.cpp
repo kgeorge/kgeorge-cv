@@ -8,7 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <strstream>
-
+#include <functional>
 #include <ctime>
 #include <cmath>
 
@@ -24,6 +24,34 @@
 using namespace std;
 using namespace cv;
 
+
+
+
+
+vector<std::function<void(char)>> handleToKeyboardFun;
+void key_callback(char keyChar, const Mat& roiOutputImage, bool &processNextFrame, bool &gracefulExit) {
+    if(handleToKeyboardFun.size() > 0) {
+        assert(handleToKeyboardFun.size() ==1);
+        handleToKeyboardFun[0](keyChar);
+    }
+    switch( keyChar ) {
+        case 's':
+        case 'S':
+            //save the output image in current directory
+            imwrite("roiOutputImageLast.jpg", roiOutputImage );
+            break;
+        case 'n':
+        case 'N':
+            processNextFrame = true;
+            break;
+        case 27:
+            gracefulExit = true;
+            break;
+        default:
+            break;
+    }
+}
+
 int main(int argc, char **argv) {
     
     //initialize the random number generator
@@ -35,9 +63,10 @@ int main(int argc, char **argv) {
     
     
     Mat roiOutputImageLast;
-    SpotIt spotIt;
-    bool continueProcessing = true;
-    for(;  ;) {
+    SpotIt spotIt(&handleToKeyboardFun);
+    bool processNextFrame = true;
+    bool gracefulExit = false;
+    for(; !gracefulExit  ;) {
         //for each frame
         Mat frame;
         Mat roiOutputImage;
@@ -63,7 +92,7 @@ int main(int argc, char **argv) {
                      80                           //maxRadius,
                      );
         vector<int> numItemsInCluster;
-        if(circles.size()>0 && continueProcessing ) {
+        if(circles.size()>0 && processNextFrame ) {
             double startTime = getTickCount();
 
             //draw only the first circle
@@ -80,7 +109,7 @@ int main(int argc, char **argv) {
             double endTime = getTickCount();
 
             cout << "frameRate: " <<  getTickFrequency()/(endTime - startTime) << endl;
-            continueProcessing = false;
+            processNextFrame = false;
         }
         if(!roiOutputImageLast.empty()) {
             Mat dst;
@@ -96,24 +125,8 @@ int main(int argc, char **argv) {
         strstream ss;
         
         ofstream myfile;
-        char c = (char)waitKey(10);
-        if( c == 27 )
-            break;
-        switch( c ) {
-            case 's':
-            case 'S':
-                //save the output image in current directory
-                imwrite("roiOutputImageLast.jpg", roiOutputImageLast );
-                break;
-
-
-            case 'n':
-            case 'N':
-                continueProcessing = true;
-                break;
-            default:
-                break;
-        }
+        char c = (char)waitKey(70);
+        key_callback(c, roiOutputImageLast, processNextFrame, gracefulExit  );
     }
     cap.release();
     destroyAllWindows();

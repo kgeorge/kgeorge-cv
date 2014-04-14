@@ -36,6 +36,28 @@ TEST( LSHHashing, PStable) {
     EXPECT_EQ(1, 1);
 }
 
+TEST( SpotIt, Write) {
+    vector< vector< Point2f > > ptClusters(2);
+    ptClusters[0].reserve(2);
+    ptClusters[0].push_back(Point2f(100, 100));
+    ptClusters[0].push_back(Point2f(200, 200));
+
+
+    ptClusters[1].reserve(1);
+    ptClusters[1].push_back(Point2f(100, 100));
+    SpotIt sp(NULL);
+    sp.writePointClusters("foo.xml", ptClusters);
+
+    vector< vector< Point2f > > ptClusters2;
+    sp.readPointClusters("foo.xml", ptClusters2);
+    
+    
+    
+    EXPECT_EQ(2, ptClusters2.size());
+    EXPECT_EQ(ptClusters[0][0], ptClusters2[0][0]);
+    
+}
+
 int main( int argc, char **argv ) {
     ::testing::InitGoogleTest(&argc, argv);
     RUN_ALL_TESTS();

@@ -15,6 +15,7 @@
 #include <unordered_set>
 #include <set>
 #include <string>
+#include <functional>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
@@ -191,21 +192,19 @@ struct ContourRepresentativePoint;
 
 class SpotIt {
 public:
-    SpotIt():
-    statsMakerMaxX("maxX"),
-    statsMakerMaxY("maxY"),
-    statsMakerMinX("minX"),
-    statsMakerMinY("minY"),
-    hash(1.0){}
+    SpotIt( std::vector< std::function<void(char)>> *pHandleToKeyboardFun );
     
-    ~SpotIt(){}
+    ~SpotIt();
     //returns true if successfully processed the circle
     bool processCircle(
                        cv::Point &circleCenter,
                        float circleRadius,
                        cv::Mat &inputImage,
                        cv::Mat &roiOutputImageCopy);
-    
+
+    void readPointClusters(const std::string &filename, std::vector< std::vector< cv::Point2f > > &ptClusters);
+    void writePointClusters(const std::string &filename, const std::vector< std::vector< cv::Point2f > > &ptClusters);
+
 protected:
     
     void cluster(
@@ -248,13 +247,25 @@ protected:
         const std::vector< std::vector< cv::Point2f> > & contours
     );
 
+    void handleKey(char keyChar) ;
+
     Kg::StatsMaker statsMakerMaxX;
     Kg::StatsMaker statsMakerMaxY;
     Kg::StatsMaker statsMakerMinX;
     Kg::StatsMaker statsMakerMinY;
-
+    std::vector< std::function<void(char)>> *pHandleToKeyboardFun;
     std::vector< std::vector<cv::Point2f> > approximatedContours;
     Hash< cv::Point2f, HashEntry, 3> hash;
+    std::vector<std::vector<cv::Point2f>> pointClusters;
+    struct  ColorScheme {
+        std::string name;
+        cv::Scalar  value;
+        ColorScheme(const std::string &name, const cv::Scalar &col):
+            name(name),value(col){}
+        ColorScheme(){}
+    };
+    std::vector<ColorScheme> colorSchemesForDrawing;
+    friend void keyBoardFun(SpotIt *p, char keyChar);
 };
 
 

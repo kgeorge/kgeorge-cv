@@ -24,9 +24,14 @@
 
 using namespace std;
 using namespace cv;
+using namespace std::placeholders;
 
 
-
+//wrapper for OGLAugmentedScene::_handleKey
+void keyBoardFun(SpotIt *p, char keyChar) {
+    p->handleKey(keyChar);
+    p->pHandleToKeyboardFun->clear();
+}
 
 template<>
 const float Quantizer<float>::kEpsilon_ = 0.000001f;
@@ -35,6 +40,43 @@ template<>
 const double Quantizer<double>::kEpsilon_ = 0.00000000001;
 
 
+
+
+   SpotIt::SpotIt( std::vector< std::function<void(char)>> *pHandleToKeyboardFun):
+    statsMakerMaxX("maxX"),
+    statsMakerMaxY("maxY"),
+    statsMakerMinX("minX"),
+    statsMakerMinY("minY"),
+    hash(1.0),
+    pHandleToKeyboardFun(pHandleToKeyboardFun){
+         //register keyboard function
+         if( pHandleToKeyboardFun ) {
+            std::function<void(char)> boundKeyboardFunBody = std::bind(keyBoardFun, this, _1 );
+            pHandleToKeyboardFun->push_back(boundKeyboardFunBody);
+       }
+        
+        colorSchemesForDrawing.reserve(11);
+        colorSchemesForDrawing.push_back( ColorScheme("blue", Scalar(255, 0, 0)) );
+        colorSchemesForDrawing.push_back( ColorScheme("red", Scalar(0, 0, 255)) );
+        colorSchemesForDrawing.push_back( ColorScheme("green", Scalar(0, 255, 0)) );
+        colorSchemesForDrawing.push_back( ColorScheme("yellow", Scalar(0, 255, 255)));
+        colorSchemesForDrawing.push_back( ColorScheme("purple", Scalar(255, 0, 255)) );
+        colorSchemesForDrawing.push_back( ColorScheme("cyan",  Scalar(255, 255, 0)) );
+        colorSchemesForDrawing.push_back( ColorScheme("bisque", Scalar(196, 228, 255)) );
+        colorSchemesForDrawing.push_back( ColorScheme("olive", Scalar(0, 128, 128)));
+                                         
+        colorSchemesForDrawing.push_back( ColorScheme("skyblue", Scalar(235, 206, 135)) );
+        colorSchemesForDrawing.push_back( ColorScheme("orange",  Scalar(0, 165, 255)) );
+        colorSchemesForDrawing.push_back( ColorScheme("limegreen", Scalar(47, 255, 173)) );
+    }
+
+
+     SpotIt::~SpotIt( ) {
+     if(  pHandleToKeyboardFun ) {
+        pHandleToKeyboardFun->clear();
+         }
+    }
+
 bool SpotIt::processCircle(
                            cv::Point &circleCenter,
                            float circleRadius,
@@ -42,7 +84,11 @@ bool SpotIt::processCircle(
                            Mat &roiOutputImage
                            ) {
     KG_DBGOUT( cout << "  inputImage type " << inputImage.type() << "  inputImage depth " << inputImage.depth() << endl );
-    
+    if(pHandleToKeyboardFun && pHandleToKeyboardFun->size() <= 0) {
+
+        std::function<void(char)> boundKeyboardFunBody = std::bind(keyBoardFun, this, _1 );
+        pHandleToKeyboardFun->push_back(boundKeyboardFunBody);
+    }
     vector<Vec4i> hierarchy;
     
     //find an roi in input image
@@ -174,10 +220,11 @@ bool SpotIt::processCircle(
     vector<KeyPoint> keyPoints;
     //extractFeaturesFromRoiOutput (roiGrayImage, keyPoints );
 
-    vector<vector<Point2f>> pointClusters(numClusters);
+    pointClusters.resize(numClusters);
     for(int i=0; i < numClusters; ++i) {
         if(numPointsForEachCluster[i] > 0) {
             pointClusters[i].reserve(numPointsForEachCluster[i]);
+            pointClusters[i].clear();
         }
     }
     vector< vector<Point> > outContours(contours.size());
@@ -235,6 +282,80 @@ void SpotIt::extractFeaturesFromRoiOutput (Mat &roiImage, vector<KeyPoint> &keyp
   featureDetector->detect(roiImage, keypoints);
 
 }
+
+
+    void SpotIt::writePointClusters(const std::string &filename, const std::vector< std::vector< cv::Point2f > > &ptClusters) {
+        FileStorage fs(filename, FileStorage::WRITE);
+        fs << "clusters";
+        fs << "[";
+        for(int i=0; i < ptClusters.size(); ++i) {
+            const vector<Point2f> &ptCluster = ptClusters[i];
+            fs << "{";
+            fs << "id" << i;
+            fs << "name" << colorSchemesForDrawing[i].name;
+            fs <<"cluster";
+            fs << "[";
+            for (int j=0; j < ptCluster.size(); ++j) {
+                fs << ptCluster[j];
+            }
+            fs << "]";
+            fs << "}";
+        }
+        fs << "]";
+    }
+
+
+    void SpotIt::readPointClusters(const std::string &filename, std::vector< std::vector< cv::Point2f > > &ptClusters) {
+        FileStorage fs(filename, FileStorage::READ);
+        if (!fs.isOpened())
+        {
+            cerr << "Failed to open " << filename << endl;
+            throw runtime_error("failed to open file");
+        }
+        FileNode n = fs["clusters"];                         // Read string sequence - Get node
+        if (n.type() != FileNode::SEQ)
+        {
+            cerr << "strings is not a sequence! FAIL" << endl;
+            throw runtime_error("strings is not a sequence! FAIL");
+        }
+
+        FileNodeIterator it = n.begin(), it_end = n.end(); // Go through the node
+        for (; it != it_end; ++it) {
+            int id = (*it)["id"];
+            string name = (*it)["name"];
+            FileNode ncl = (*it)["cluster"];
+             if (ncl.type() != FileNode::SEQ)
+            {
+                cerr << "strings is not a sequence! FAIL" << endl;
+                throw runtime_error("strings is not a sequence! FAIL");
+            }
+            FileNodeIterator it2 = ncl.begin(), it2_end = ncl.end(); // Go through the node
+            vector<Point2f> ptCluster;
+            for (; it2 != it2_end; ++it2) {
+                Point2f pt;
+                *it2 >> pt;
+                ptCluster.push_back(pt);
+                //Point2f pt (*it2);
+            }
+            ptClusters.push_back(ptCluster);
+        }
+    }
+
+
+    void SpotIt::handleKey(char keyChar) {
+        std::cout << "SpotIt::handling key char: " << keyChar <<  std::endl;
+
+    switch( keyChar ) {
+        case 'c':
+        case 'C':
+            writePointClusters("pointCluster.xml", pointClusters);
+            //write the pointCluster to a file
+            //save the output image in current directory
+            break;
+        default:
+            break;
+    }
+    }
 
 void SpotIt::approximateCurves(
     const vector<vector<Point> > & inContours,
@@ -722,22 +843,6 @@ void SpotIt::drawOutput(
                         float sse){
     static char sbuffer[1024];
 
-    //make random colors for displaying
-    static RNG rng1(12345), rng2(54321);
-    static const Scalar colorMark[] = {
-        Scalar(255, 0, 0), //blue
-        Scalar(0, 0, 255), //red
-        Scalar(0, 255, 0), //green
-        Scalar(0, 255, 255), //yellow
-        Scalar(255, 0, 255), //purple
-        Scalar(255, 255, 0), //cyan
-        Scalar(196, 228, 255), //bisque
-        Scalar(0, 128, 128), //olive
-        Scalar(235, 206, 135), //skyblue
-        Scalar(0, 165, 255), //orange
-        Scalar(47, 255, 173), //lime green
-    };
-
     for(int i=0; i < contours.size(); ++i) {
         if(!shouldProcessContour[i]) {
             continue;
@@ -748,20 +853,20 @@ void SpotIt::drawOutput(
                      roiOutputImage,
                      contours,
                      i,
-                     colorMark[iColorIdx]
+                     colorSchemesForDrawing[iColorIdx].value
                      );
         drawContours(
                      inputImage,
                      contours,
                      i,
-                     colorMark[iColorIdx]
+                     colorSchemesForDrawing[iColorIdx].value
                      );
 
     }
     for(int i=0; i < clusterCenters.size(); ++i) {
 
         Point clusterCenterImagePoint = Point(round(clusterCenters[i].meanPoint.x), round(clusterCenters[i].meanPoint.y));
-        circle(roiOutputImage, clusterCenterImagePoint , 4, colorMark[i], -1, 8);
+        circle(roiOutputImage, clusterCenterImagePoint , 4, colorSchemesForDrawing[i].value, -1, 8);
 
     }
 
