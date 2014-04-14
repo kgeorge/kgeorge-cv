@@ -28,18 +28,18 @@ using namespace std::placeholders;
 
 
 //wrapper for OGLAugmentedScene::_handleKey
-void keyBoardFun(SpotIt *p, char keyChar) {
+void keyboardCallback(SpotIt *p, char keyChar) {
     bool bVal = p->handleKey(keyChar);
     if(bVal) {
-        p->pHandleToKeyboardFun->clear();
+        p->pKeyboardCallbackRegistry->clear();
     }
 }
 
 
 
 
-void mouseFun(SpotIt *p, int event, int x, int y, int flags, void * userdata) {
-     p->handleMouse( event, x, y, flags, userdata);
+void mouseCallback(SpotIt *p, int event, int x, int y, int flags, void * userdata) {
+    p->handleMouse( event, x, y, flags, userdata);
 }
 
 template<>
@@ -51,51 +51,51 @@ const double Quantizer<double>::kEpsilon_ = 0.00000000001;
 
 
 
-   SpotIt::SpotIt( std::vector< std::function<void(char)>> *pHandleToKeyboardFun, std::vector<std::function<void(int, int, int, int, void*)>> *pHandleToMouseFun):
-    statsMakerMaxX("maxX"),
-    statsMakerMaxY("maxY"),
-    statsMakerMinX("minX"),
-    statsMakerMinY("minY"),
-    hash(1.0),
-    pHandleToKeyboardFun(pHandleToKeyboardFun),
-    pHandleToMouseFun(pHandleToMouseFun){
-         //register keyboard function
-         if( pHandleToKeyboardFun ) {
-            std::function<void(char)> boundKeyboardFunBody = std::bind(keyBoardFun, this, _1 );
-            pHandleToKeyboardFun->push_back(boundKeyboardFunBody);
-         }
-
-         if( pHandleToMouseFun ) {
-            std::function<void(int, int, int, int, void *)> boundMouseFunBody = std::bind(mouseFun, this, _1, _2, _3, _4, _5 );
-            pHandleToMouseFun->push_back(boundMouseFunBody);
-         }
-
-        
-        colorSchemesForDrawing.reserve(11);
-        colorSchemesForDrawing.push_back( ColorScheme("blue", Scalar(255, 0, 0)) );
-        colorSchemesForDrawing.push_back( ColorScheme("red", Scalar(0, 0, 255)) );
-        colorSchemesForDrawing.push_back( ColorScheme("green", Scalar(0, 255, 0)) );
-        colorSchemesForDrawing.push_back( ColorScheme("yellow", Scalar(0, 255, 255)));
-        colorSchemesForDrawing.push_back( ColorScheme("purple", Scalar(255, 0, 255)) );
-        colorSchemesForDrawing.push_back( ColorScheme("cyan",  Scalar(255, 255, 0)) );
-        colorSchemesForDrawing.push_back( ColorScheme("bisque", Scalar(196, 228, 255)) );
-        colorSchemesForDrawing.push_back( ColorScheme("olive", Scalar(0, 128, 128)));
-                                         
-        colorSchemesForDrawing.push_back( ColorScheme("skyblue", Scalar(235, 206, 135)) );
-        colorSchemesForDrawing.push_back( ColorScheme("orange",  Scalar(0, 165, 255)) );
-        colorSchemesForDrawing.push_back( ColorScheme("limegreen", Scalar(47, 255, 173)) );
+SpotIt::SpotIt( std::vector< std::function<void(char)>> *pKeyboardCallbackRegistry, std::vector<std::function<void(int, int, int, int, void*)>> *pMouseCallbackRegistry):
+statsMakerMaxX("maxX"),
+statsMakerMaxY("maxY"),
+statsMakerMinX("minX"),
+statsMakerMinY("minY"),
+hash(1.0),
+pKeyboardCallbackRegistry(pKeyboardCallbackRegistry),
+pMouseCallbackRegistry(pMouseCallbackRegistry){
+    //register keyboard function
+    if( pKeyboardCallbackRegistry ) {
+        std::function<void(char)> boundKeyboardFunBody = std::bind(keyboardCallback, this, _1 );
+        pKeyboardCallbackRegistry->push_back(boundKeyboardFunBody);
     }
-
-
-     SpotIt::~SpotIt( ) {
-     if(  pHandleToKeyboardFun ) {
-        pHandleToKeyboardFun->clear();
-         }
-
-     if(  pHandleToMouseFun ) {
-        pHandleToMouseFun->clear();
-         }
+    
+    if( pMouseCallbackRegistry ) {
+        std::function<void(int, int, int, int, void *)> boundMouseFunBody = std::bind(mouseCallback, this, _1, _2, _3, _4, _5 );
+        pMouseCallbackRegistry->push_back(boundMouseFunBody);
     }
+    
+    
+    colorSchemesForDrawing.reserve(11);
+    colorSchemesForDrawing.push_back( ColorScheme("blue", Scalar(255, 0, 0)) );
+    colorSchemesForDrawing.push_back( ColorScheme("red", Scalar(0, 0, 255)) );
+    colorSchemesForDrawing.push_back( ColorScheme("green", Scalar(0, 255, 0)) );
+    colorSchemesForDrawing.push_back( ColorScheme("yellow", Scalar(0, 255, 255)));
+    colorSchemesForDrawing.push_back( ColorScheme("purple", Scalar(255, 0, 255)) );
+    colorSchemesForDrawing.push_back( ColorScheme("cyan",  Scalar(255, 255, 0)) );
+    colorSchemesForDrawing.push_back( ColorScheme("bisque", Scalar(196, 228, 255)) );
+    colorSchemesForDrawing.push_back( ColorScheme("olive", Scalar(0, 128, 128)));
+    
+    colorSchemesForDrawing.push_back( ColorScheme("skyblue", Scalar(235, 206, 135)) );
+    colorSchemesForDrawing.push_back( ColorScheme("orange",  Scalar(0, 165, 255)) );
+    colorSchemesForDrawing.push_back( ColorScheme("limegreen", Scalar(47, 255, 173)) );
+}
+
+
+SpotIt::~SpotIt( ) {
+    if(  pKeyboardCallbackRegistry ) {
+        pKeyboardCallbackRegistry->clear();
+    }
+    
+    if(  pMouseCallbackRegistry ) {
+        pMouseCallbackRegistry->clear();
+    }
+}
 
 bool SpotIt::processCircle(
                            cv::Point &circleCenter,
@@ -104,10 +104,10 @@ bool SpotIt::processCircle(
                            Mat &roiOutputImage
                            ) {
     KG_DBGOUT( cout << "  inputImage type " << inputImage.type() << "  inputImage depth " << inputImage.depth() << endl );
-    if(pHandleToKeyboardFun && pHandleToKeyboardFun->size() <= 0) {
-
-        std::function<void(char)> boundKeyboardFunBody = std::bind(keyBoardFun, this, _1 );
-        pHandleToKeyboardFun->push_back(boundKeyboardFunBody);
+    if(pKeyboardCallbackRegistry && pKeyboardCallbackRegistry->size() <= 0) {
+        
+        std::function<void(char)> boundKeyboardFunBody = std::bind(keyboardCallback, this, _1 );
+        pKeyboardCallbackRegistry->push_back(boundKeyboardFunBody);
     }
     vector<Vec4i> hierarchy;
     
@@ -161,7 +161,7 @@ bool SpotIt::processCircle(
         vector<Point> &contour = contours[i];
         //number of points in the contour that falls within the circle
         int numPointsInCircle = 0;
-
+        
         int sumDistSqFromCircle = 0;
         int sumSqDistSqFromCircle =  0;
         for(int j=0; j < contour.size(); ++j) {
@@ -178,10 +178,10 @@ bool SpotIt::processCircle(
         //if 90% of pointsof contour falls within the circle,
         //then this is a contour that need be further processed
         if( percentageNumPointsInCircle > 90.0 ) {
-        //if( avgDistSqFromCircle > 1000.0 ) {
+            //if( avgDistSqFromCircle > 1000.0 ) {
             assert(contour.size() > 0);
             shouldProcessContour[i] = true;
-
+            
             KG_DBGOUT( cout << "~~~~~~~~~~~~~~~~" << endl);
             KG_DBGOUT( cout << "mu= " << avgDistSqFromCircle << ", rho=" << varianceDistSqFromCircle <<  endl);
             nContoursGood++;
@@ -198,10 +198,10 @@ bool SpotIt::processCircle(
     int numClusters=0;
     vector<int> clusterAssignments;
     float sse = numeric_limits<float>::max();
-
-
+    
+    
     vector<ContourRepresentativePoint> clusterCenters;
-
+    
     cluster(
             roiHsvComponents[0], //hue component of roi
             contours,           //output from findContours
@@ -211,14 +211,14 @@ bool SpotIt::processCircle(
             numClusters,  //number of clusters,
             sse //sum of squared error
             );
-
+    
     
     
     vector<vector<Point2f>> approximatedContours(contours.size());
     approximateCurves( contours, shouldProcessContour,  approximatedContours  );
-
-
-
+    
+    
+    
     map<int, int> numPointsForEachCluster;
     for(int i=0; i < numClusters; ++i) {
         numPointsForEachCluster[i] =0;
@@ -230,14 +230,14 @@ bool SpotIt::processCircle(
             numPointsForEachCluster[clusterId] += approximatedContours[i].size();
         }
     }
-
+    
     //draw the output onto the output images
     roiOutputImage.create(roiGrayImage.size(), inputImage.type() );
     roiOutputImage = Scalar(0,0,0);
-
+    
     vector<KeyPoint> keyPoints;
     //extractFeaturesFromRoiOutput (roiGrayImage, keyPoints );
-
+    
     pointClusters.resize(numClusters);
     for(int i=0; i < numClusters; ++i) {
         if(numPointsForEachCluster[i] > 0) {
@@ -279,15 +279,15 @@ bool SpotIt::processCircle(
                inputImage,
                roiOutputImage,
                sse);
-
+    
     return true;
 }
 
 
 void SpotIt::geometricHashBuilding(
-    const vector<vector<Point2f> > & contours
-    )
-    {
+                                   const vector<vector<Point2f> > & contours
+                                   )
+{
     //KgGeometricHashing<vector<Point2f>,  Quantizer<float>, KgGeometricHashing_Traits< vector<Point2f> > > geomHash(contours.begin(), contours.end());
     KgGeometricHashing<vector<Point2f>,  Quantizer<float> >  geomHash(contours.begin(), contours.end());
     geomHash.processTemplateSet(0.16f, hash);
@@ -300,99 +300,99 @@ void SpotIt::geometricHashBuilding(
     std::cout << statsMakerMaxY;
     std::cout << statsMakerMinX;
     std::cout << statsMakerMinY;
-
+    
 }
 
 
 void SpotIt::extractFeaturesFromRoiOutput (Mat &roiImage, vector<KeyPoint> &keypoints ) {
-
-  Ptr<FeatureDetector> featureDetector = FeatureDetector::create("SIFT");
-
-  featureDetector->detect(roiImage, keypoints);
-
+    
+    Ptr<FeatureDetector> featureDetector = FeatureDetector::create("SIFT");
+    
+    featureDetector->detect(roiImage, keypoints);
+    
 }
 
 
-    void SpotIt::writePointClusters(const std::string &filename, const std::vector< std::vector< cv::Point2f > > &ptClusters) {
-        FileStorage fs(filename, FileStorage::WRITE);
-        fs << "clusters";
+void SpotIt::writePointClusters(const std::string &filename, const std::vector< std::vector< cv::Point2f > > &ptClusters) {
+    FileStorage fs(filename, FileStorage::WRITE);
+    fs << "clusters";
+    fs << "[";
+    for(int i=0; i < ptClusters.size(); ++i) {
+        const vector<Point2f> &ptCluster = ptClusters[i];
+        fs << "{";
+        fs << "id" << i;
+        fs << "comment" << "no comments";
+        fs << "score" << "{";
+        fs << "outlineOnly" << 80;
+        fs << "noNoise" << 100;
+        fs << "bigSize" << 50;
+        fs << "color" << colorSchemesForDrawing[i].name;
+        fs << "connectedness" << 100;
+        fs << "}";
+        fs << "name" << colorSchemesForDrawing[i].name;
+        fs <<"cluster";
         fs << "[";
-        for(int i=0; i < ptClusters.size(); ++i) {
-            const vector<Point2f> &ptCluster = ptClusters[i];
-            fs << "{";
-            fs << "id" << i;
-            fs << "comment" << "no comments";
-            fs << "score" << "{";
-                fs << "outlineOnly" << 80;
-                fs << "noNoise" << 100;
-                fs << "bigSize" << 50;
-                fs << "color" << colorSchemesForDrawing[i].name;
-                fs << "connectedness" << 100;
-            fs << "}";
-            fs << "name" << colorSchemesForDrawing[i].name;
-            fs <<"cluster";
-            fs << "[";
-            for (int j=0; j < ptCluster.size(); ++j) {
-                fs << ptCluster[j];
-            }
-            fs << "]";
-            fs << "}";
+        for (int j=0; j < ptCluster.size(); ++j) {
+            fs << ptCluster[j];
         }
         fs << "]";
+        fs << "}";
     }
+    fs << "]";
+}
 
 
-    void SpotIt::readPointClusters(const std::string &filename, std::vector< std::vector< cv::Point2f > > &ptClusters) {
-        FileStorage fs(filename, FileStorage::READ);
-        if (!fs.isOpened())
-        {
-            cerr << "Failed to open " << filename << endl;
-            throw runtime_error("failed to open file");
-        }
-        FileNode n = fs["clusters"];                         // Read string sequence - Get node
-        if (n.type() != FileNode::SEQ)
+void SpotIt::readPointClusters(const std::string &filename, std::vector< std::vector< cv::Point2f > > &ptClusters) {
+    FileStorage fs(filename, FileStorage::READ);
+    if (!fs.isOpened())
+    {
+        cerr << "Failed to open " << filename << endl;
+        throw runtime_error("failed to open file");
+    }
+    FileNode n = fs["clusters"];                         // Read string sequence - Get node
+    if (n.type() != FileNode::SEQ)
+    {
+        cerr << "strings is not a sequence! FAIL" << endl;
+        throw runtime_error("strings is not a sequence! FAIL");
+    }
+    
+    FileNodeIterator it = n.begin(), it_end = n.end(); // Go through the node
+    for (; it != it_end; ++it) {
+        int id = (*it)["id"];
+        string name = (*it)["name"];
+        FileNode ncl = (*it)["cluster"];
+        string comment = (*it)["comment"];
+        FileNode sc = (*it) ["score"];
+        int outlineOnly =0;
+        outlineOnly << (int)sc["outlineOnly"];
+        int noise =0;
+        noise << (int)sc["noNoise"];
+        int connectedness =0;
+        connectedness << (int)sc["connectedness"];
+        int bigSize =0;
+        bigSize << (int)sc["bigSize"];
+        string color;
+        color  = (string)sc["color"];
+        if (ncl.type() != FileNode::SEQ)
         {
             cerr << "strings is not a sequence! FAIL" << endl;
             throw runtime_error("strings is not a sequence! FAIL");
         }
-
-        FileNodeIterator it = n.begin(), it_end = n.end(); // Go through the node
-        for (; it != it_end; ++it) {
-            int id = (*it)["id"];
-            string name = (*it)["name"];
-            FileNode ncl = (*it)["cluster"];
-            string comment = (*it)["comment"];
-            FileNode sc = (*it) ["score"];
-            int outlineOnly =0;
-            outlineOnly << (int)sc["outlineOnly"];
-            int noise =0;
-            noise << (int)sc["noNoise"];
-            int connectedness =0;
-            connectedness << (int)sc["connectedness"];
-            int bigSize =0;
-            bigSize << (int)sc["bigSize"];
-            string color;
-            color  = (string)sc["color"];
-             if (ncl.type() != FileNode::SEQ)
-            {
-                cerr << "strings is not a sequence! FAIL" << endl;
-                throw runtime_error("strings is not a sequence! FAIL");
-            }
-            FileNodeIterator it2 = ncl.begin(), it2_end = ncl.end(); // Go through the node
-            vector<Point2f> ptCluster;
-            for (; it2 != it2_end; ++it2) {
-                Point2f pt;
-                *it2 >> pt;
-                ptCluster.push_back(pt);
-                //Point2f pt (*it2);
-            }
-            ptClusters.push_back(ptCluster);
+        FileNodeIterator it2 = ncl.begin(), it2_end = ncl.end(); // Go through the node
+        vector<Point2f> ptCluster;
+        for (; it2 != it2_end; ++it2) {
+            Point2f pt;
+            *it2 >> pt;
+            ptCluster.push_back(pt);
+            //Point2f pt (*it2);
         }
+        ptClusters.push_back(ptCluster);
     }
+}
 
 
-    bool SpotIt::handleKey(char keyChar) {
-        bool retVal = false;
+bool SpotIt::handleKey(char keyChar) {
+    bool retVal = false;
     switch( keyChar ) {
         case 'c':
         case 'C':
@@ -406,16 +406,16 @@ void SpotIt::extractFeaturesFromRoiOutput (Mat &roiImage, vector<KeyPoint> &keyp
             break;
     }
     return retVal;
-    }
+}
 
 
 
-    bool SpotIt::handleMouse( int event, int x, int y, int flags, void * userdata) {
-        bool retVal = true;
-
-
-     if  ( event == EVENT_LBUTTONDOWN )
-     {
+bool SpotIt::handleMouse( int event, int x, int y, int flags, void * userdata) {
+    bool retVal = true;
+    
+    
+    if  ( event == EVENT_LBUTTONDOWN )
+    {
         //select the nearest pointClusterCentroid
         Point2f mousePoint(x, y);
         float minDistSq = numeric_limits<float>::max();
@@ -430,21 +430,21 @@ void SpotIt::extractFeaturesFromRoiOutput (Mat &roiImage, vector<KeyPoint> &keyp
         }
         assert(whichClusterIdx >= 0);
         std::cout << "selected cluster: "  << colorSchemesForDrawing[whichClusterIdx].name.c_str() << std::endl;
-     }
-        return retVal;
     }
+    return retVal;
+}
 
 void SpotIt::approximateCurves(
-    const vector<vector<Point> > & inContours,
-    const std::vector<bool> &shouldProcessContour,
-    vector<vector<Point2f> > & outContours ) {
+                               const vector<vector<Point> > & inContours,
+                               const std::vector<bool> &shouldProcessContour,
+                               vector<vector<Point2f> > & outContours ) {
     int numPointsBeforeSimplification = 0;
     vector<Point> outContourInt;
     for(int i=0; i < inContours.size(); ++i) {
         numPointsBeforeSimplification += ( shouldProcessContour[i]) ? inContours[i].size() : 0;
     }
     for(int i=0; i< inContours.size(); ++i) {
-
+        
         if( shouldProcessContour[i]) {
             vector<Point2f> &outContour = outContours[i];
             outContourInt.clear();
@@ -472,7 +472,7 @@ void SpotIt::approximateCurves(
 
 struct ClusterItem {
     float data_[4];
-
+    
     ClusterItem(){
         data_[0] = data_[1] = data_[2] = data_[3] = 0;
     }
@@ -490,14 +490,14 @@ struct ClusterItem {
         return *this;
     }
     ClusterItem &operator+(const ClusterItem &rhs) {
-
+        
         data_[0] += rhs.data_[0];
         data_[1] += rhs.data_[1];
         data_[2] += rhs.data_[2];
         data_[3] += rhs.data_[3];
         return *this;
     }
-
+    
     ClusterItem &operator*(float scale) {
         data_[0] *= scale;
         data_[1] *= scale;
@@ -505,7 +505,7 @@ struct ClusterItem {
         data_[3] += scale;
         return *this;
     }
-
+    
     ClusterItem &operator-(const ClusterItem &rhs) {
         data_[0] -= rhs.data_[0];
         data_[1] -= rhs.data_[1];
@@ -513,15 +513,15 @@ struct ClusterItem {
         data_[3] -= rhs.data_[3];
         return *this;
     }
-
+    
     //last weight item is the sum of all other weights
     friend float dot(const ClusterItem &lhs, const ClusterItem &rhs , const float weights[]) {
         //return (weights[0] * lhs.data_[0] * rhs.data_[0] +  weights[1] * lhs.data_[1] * rhs.data_[1] +  weights[2] * lhs.data_[2] * rhs.data_[2] + weights[3] * lhs.data_[3] * rhs.data_[3])/weights[4];
         return (weights[0] * lhs.data_[0] * rhs.data_[0] +  weights[1] * lhs.data_[1] * rhs.data_[1] +  weights[2] * lhs.data_[2] * rhs.data_[2] )/weights[4];
-
+        
     }
-
-
+    
+    
 };
 
 //We represent each contour by a representative point (ContourRepPoint) and
@@ -627,8 +627,8 @@ struct ContourRepresentativePoint {
         }
         return cpAvg;
     }
-
-
+    
+    
     static ContourRepresentativePoint translateBack( const ClusterItem &citem, const ContourRepresentativePoint &cpAvg) {
         ContourRepresentativePoint cpSample(cpAvg);
         cpSample.meanPoint.x = citem.data_[0] * sqrt(cpAvg.variance.x) + cpAvg.meanPoint.x;
@@ -711,15 +711,15 @@ struct std::less<ClusterItem> : std::binary_function<ClusterItem, ClusterItem, b
 //order the element for custom initialization
 template<typename T, typename TTraits = KMeansDataElementTraits<T> >
 struct InitComp : std::binary_function<T, T, bool> {
-
+    
     InitComp( const T &refElement):refElement(refElement){}
-
+    
     bool operator()(const T &l, const T &r) {
         float lmin = TTraits::dist(l, refElement);
         float rmin = TTraits::dist(r, refElement);
         return lmin < rmin;
     }
-
+    
     const T &refElement;
 };
 
@@ -731,93 +731,93 @@ bool SpotIt::customInitialClusterAssignment( int k,
                                             const map<int, int> &indexReMapping,
                                             vector<ClusterItem> &clusterCenters,
                                             vector<int> &itemsSelected
-) {
-        clusterCenters.assign(k, ClusterItem());
-
-        static RNG rng1(12345);
-
-        //first let us get some statistics about the items
-        //get component-wise minimum, maximum and average
-        float minComponents[4];
-        float maxComponents[4];
-        for(int i=0; i < 4; ++i ) {
-            minComponents[i] = numeric_limits<float>::max();
-            maxComponents[i] = -numeric_limits<float>::max();
+                                            ) {
+    clusterCenters.assign(k, ClusterItem());
+    
+    static RNG rng1(12345);
+    
+    //first let us get some statistics about the items
+    //get component-wise minimum, maximum and average
+    float minComponents[4];
+    float maxComponents[4];
+    for(int i=0; i < 4; ++i ) {
+        minComponents[i] = numeric_limits<float>::max();
+        maxComponents[i] = -numeric_limits<float>::max();
+    }
+    
+    for(int i=0; i < items.size(); ++i) {
+        const ClusterItem & it = items[i];
+        for(int j=0; j < 4; ++j ) {
+            minComponents[j] = Kg::min(it.data_[j], minComponents[j]);
+            maxComponents[j] = Kg::max(it.data_[j], maxComponents[j]);
         }
-
-        for(int i=0; i < items.size(); ++i) {
-            const ClusterItem & it = items[i];
-            for(int j=0; j < 4; ++j ) {
-                minComponents[j] = Kg::min(it.data_[j], minComponents[j]);
-                maxComponents[j] = Kg::max(it.data_[j], maxComponents[j]);
-            }
-        }
-
-        //container for storing already selected clusterCenters
-        set<ClusterItem, std::less<ClusterItem> > itemsSoFarSelectedForInitialization;
-        //select up to k non-unique items
-        for(int m=0; m < k; ++m) {
-            int maxIterations = 100;
-            ClusterItem prospectiveItem;
-            //our initialization should ideally produce clusterCenters which have a pairwise distance of 'minimumDistanceBetweenSelectedClusterCenters'
-            float minimumDistanceBetweenSelectedClusterCenters = 0.5f;
-            bool foundMthClusterCenter = false;
-            while ( !foundMthClusterCenter && (minimumDistanceBetweenSelectedClusterCenters /= 2.0f) > 0.0001) {
-                //if we cant find good initializations in 100 iterations
-                //try reducing minimumDistanceBetweenSelectedClusterCenters
-                while(--maxIterations > 0) {
-                    //for the first 25 iterations try clusterCenters from the input items
-                    if(maxIterations > 75 ) {
-                        float r = 1;
-                        while(r >= 1.0f) {
-                            r = Kg::uRand0To1();
-                        }
-
-                        int prospectiveItemIndex =  floor(r * items.size());
-                        assert( prospectiveItemIndex < items.size());
-                        map<int,int>::const_iterator mit = indexReMapping.find(prospectiveItemIndex);
-                        int contourIndex = mit->second;
-                        double contourLength = arcLength(contours[contourIndex], false);
-                        if(contourLength < 100) {
-                            continue;
-                        }
-                        prospectiveItem = items[prospectiveItemIndex];
-                        itemsSelected.push_back(prospectiveItemIndex);
-
-                    } else {
-                        //if the first 25 iterations doesnt yield k clusterCenters which are seperated by 'minimumDistanceBetweenSelectedClusterCenters'
-                        //try randomization of the range
-                        for(int j=0; j < 4; ++j) {
-                            prospectiveItem.data_[j] =   rng1.uniform(minComponents[j], maxComponents[j]);
-                        }
+    }
+    
+    //container for storing already selected clusterCenters
+    set<ClusterItem, std::less<ClusterItem> > itemsSoFarSelectedForInitialization;
+    //select up to k non-unique items
+    for(int m=0; m < k; ++m) {
+        int maxIterations = 100;
+        ClusterItem prospectiveItem;
+        //our initialization should ideally produce clusterCenters which have a pairwise distance of 'minimumDistanceBetweenSelectedClusterCenters'
+        float minimumDistanceBetweenSelectedClusterCenters = 0.5f;
+        bool foundMthClusterCenter = false;
+        while ( !foundMthClusterCenter && (minimumDistanceBetweenSelectedClusterCenters /= 2.0f) > 0.0001) {
+            //if we cant find good initializations in 100 iterations
+            //try reducing minimumDistanceBetweenSelectedClusterCenters
+            while(--maxIterations > 0) {
+                //for the first 25 iterations try clusterCenters from the input items
+                if(maxIterations > 75 ) {
+                    float r = 1;
+                    while(r >= 1.0f) {
+                        r = Kg::uRand0To1();
                     }
-                    //compare already selected clusterCenters with prospectiveItem
-                    InitComp<ClusterItem, KMeansDataElementTraits<ClusterItem> > comp( prospectiveItem );
-                    auto min_elem_iter = std::min_element( itemsSoFarSelectedForInitialization.begin(), itemsSoFarSelectedForInitialization.end(), comp);
-                    float dist_from_other_elements_so_far = 0.0f;
-                    if(min_elem_iter != itemsSoFarSelectedForInitialization.end() ) {
-                        dist_from_other_elements_so_far = KMeansDataElementTraits<ClusterItem>::dist(*min_elem_iter, prospectiveItem );
+                    
+                    int prospectiveItemIndex =  floor(r * items.size());
+                    assert( prospectiveItemIndex < items.size());
+                    map<int,int>::const_iterator mit = indexReMapping.find(prospectiveItemIndex);
+                    int contourIndex = mit->second;
+                    double contourLength = arcLength(contours[contourIndex], false);
+                    if(contourLength < 100) {
+                        continue;
                     }
-                    if( (min_elem_iter == itemsSoFarSelectedForInitialization.end())  || dist_from_other_elements_so_far > minimumDistanceBetweenSelectedClusterCenters) {
-                        //if the prospectiveItem has a pairwise distance of atleast minimumDistanceBetweenSelectedClusterCenters,
-                        //the go ahead and move to the next 'm'th clusterItem
-                        itemsSoFarSelectedForInitialization.insert(prospectiveItem);
-                        foundMthClusterCenter = true;
-                        break;
+                    prospectiveItem = items[prospectiveItemIndex];
+                    itemsSelected.push_back(prospectiveItemIndex);
+                    
+                } else {
+                    //if the first 25 iterations doesnt yield k clusterCenters which are seperated by 'minimumDistanceBetweenSelectedClusterCenters'
+                    //try randomization of the range
+                    for(int j=0; j < 4; ++j) {
+                        prospectiveItem.data_[j] =   rng1.uniform(minComponents[j], maxComponents[j]);
                     }
                 }
+                //compare already selected clusterCenters with prospectiveItem
+                InitComp<ClusterItem, KMeansDataElementTraits<ClusterItem> > comp( prospectiveItem );
+                auto min_elem_iter = std::min_element( itemsSoFarSelectedForInitialization.begin(), itemsSoFarSelectedForInitialization.end(), comp);
+                float dist_from_other_elements_so_far = 0.0f;
+                if(min_elem_iter != itemsSoFarSelectedForInitialization.end() ) {
+                    dist_from_other_elements_so_far = KMeansDataElementTraits<ClusterItem>::dist(*min_elem_iter, prospectiveItem );
+                }
+                if( (min_elem_iter == itemsSoFarSelectedForInitialization.end())  || dist_from_other_elements_so_far > minimumDistanceBetweenSelectedClusterCenters) {
+                    //if the prospectiveItem has a pairwise distance of atleast minimumDistanceBetweenSelectedClusterCenters,
+                    //the go ahead and move to the next 'm'th clusterItem
+                    itemsSoFarSelectedForInitialization.insert(prospectiveItem);
+                    foundMthClusterCenter = true;
+                    break;
+                }
             }
-            //hangup on failure
-            if( minimumDistanceBetweenSelectedClusterCenters <= 0.0001) {
-                KG_DBGOUT ( std::cout << "Custom Initialization:  cant find initialization"  << std::endl );
-                clusterCenters.clear();
-                return false;
-            }
-            
-            clusterCenters[m] = prospectiveItem;
         }
-        return true;
+        //hangup on failure
+        if( minimumDistanceBetweenSelectedClusterCenters <= 0.0001) {
+            KG_DBGOUT ( std::cout << "Custom Initialization:  cant find initialization"  << std::endl );
+            clusterCenters.clear();
+            return false;
+        }
+        
+        clusterCenters[m] = prospectiveItem;
     }
+    return true;
+}
 
 
 void SpotIt::cluster(
@@ -870,12 +870,12 @@ void SpotIt::cluster(
     vector<ClusterItem> clusterCentersInitialization;
     vector<int> itemsSelected;
     bool wasSuccessful = customInitialClusterAssignment(
-        desiredK,
-        clusterItems,
-        contours,
-        indexReMapping,
-        clusterCentersInitialization,
-        itemsSelected);
+                                                        desiredK,
+                                                        clusterItems,
+                                                        contours,
+                                                        indexReMapping,
+                                                        clusterCentersInitialization,
+                                                        itemsSelected);
     KMeansClustering<ClusterItem> cluster(desiredK, clusterItems, clusterCentersInitialization);
     KG_DBGOUT(cout << "#################" << endl);
     for(int j=0; j < itemsSelected.size(); ++j) {
@@ -891,13 +891,13 @@ void SpotIt::cluster(
     sse = cluster.getOutputLastSSEForAllItems();
     const vector<int> &outputClusterAssignments = cluster.getOutputClusterAssignments();
     clusterAssignments.assign(contours.size(), -1);
-
+    
     const vector<ClusterItem> &citems = cluster.getClusterCenters();
     clusterCenters.assign(citems.size(), ContourRepresentativePoint());
     for(int i=0; i < citems.size(); ++i) {
-       clusterCenters[i] =  ContourRepresentativePoint::translateBack( citems[i], cpAvg);
+        clusterCenters[i] =  ContourRepresentativePoint::translateBack( citems[i], cpAvg);
     }
-
+    
     for(int j=0; j < outputClusterAssignments.size(); ++j) {
         map<int, int>::const_iterator mit = indexReMapping.find(j);
         assert(mit != indexReMapping.end());
@@ -919,12 +919,12 @@ void SpotIt::drawOutput(
                         Mat &roiOutputImage,
                         float sse){
     static char sbuffer[1024];
-
+    
     for(int i=0; i < contours.size(); ++i) {
         if(!shouldProcessContour[i]) {
             continue;
         }
-
+        
         int iColorIdx = clusterAssignments[i];
         drawContours(
                      roiOutputImage,
@@ -938,21 +938,21 @@ void SpotIt::drawOutput(
                      i,
                      colorSchemesForDrawing[iColorIdx].value
                      );
-
+        
     }
     for(int i=0; i < clusterCenters.size(); ++i) {
-
+        
         Point clusterCenterImagePoint = Point(round(clusterCenters[i].meanPoint.x), round(clusterCenters[i].meanPoint.y));
         circle(roiOutputImage, clusterCenterImagePoint , 4, colorSchemesForDrawing[i].value, -1, 8);
-
+        
     }
-
+    
     Scalar featureColor(255, 255, 255);
     drawKeypoints(roiOutputImage, keyPoints, roiOutputImage, featureColor, DrawMatchesFlags::DEFAULT);
-
-
-
+    
+    
+    
     sprintf(sbuffer, "sse. %f", sse);
     putText(roiOutputImage, sbuffer, cvPoint(20,20),
-    FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(200,200,250), 1, CV_AA);
+            FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(200,200,250), 1, CV_AA);
 }

@@ -28,26 +28,26 @@ template<>
 struct KgGeometricHashing_Traits< cv::Point2f >{
     typedef cv::Point2f T;
     typedef AppropriateNonIntegralType<T::value_type>::value_type K;
-
+    
     static K distSqrd(const T &l, const T &r) {
         T diff = r - l;
         return static_cast< K > ( diff.x * diff.x + diff.y * diff.y);
     }
-
+    
     static T orthogonal(const T &p) {
         return T(-p.y, p.x);
     }
-
+    
     static K dot( const T & l, const T &r) {
         return l.x * r.x + l.y * r.y;
     }
-
+    
     static T &negate(T &val) {
         val.x = - val.x;
         val.y = -val.y;
         return val;
     }
-
+    
     //returns  -1 for left, 0 for on , +1 for right
     static int leftRightOrOn(const T &a, const T &b, const T &c) {
         static const K zero = static_cast<K>(0.0);
@@ -57,13 +57,13 @@ struct KgGeometricHashing_Traits< cv::Point2f >{
         EpsilonEq<K> eps;
         return (eps(determinant, zero)) ?  0 : (( determinant < zero) ? -1 : 1 );
     }
-
-
+    
+    
     friend T & operator * ( T &l, K s) {
         l *= s;
         return l;
     }
-
+    
 };
 
 
@@ -72,7 +72,7 @@ struct HashEntry {
     cv::Point2f r;
     int count;
     HashEntry(const cv::Point2f &l, const cv::Point2f &r):
-        l(l), r(r), count(0){}
+    l(l), r(r), count(0){}
     HashEntry():count(0){}
     bool operator==(const HashEntry &h) {
         return h.l == l && h.r == r;
@@ -98,11 +98,11 @@ struct Hash< cv::Point2f,HashEntry, n  > {
             b[i] = udist(gen);
         }
     }
-
+    
     int findIndex( int ret[n]) {
         return ret[2] * 160 * 160 + ret[1] * 160 + ret[0];
     }
-
+    
     void index( const T &arg, const HashEntry & entry) {
         K temp;
         for(int i=0; i < n; ++i) {
@@ -134,8 +134,8 @@ struct Hash< cv::Point2f,HashEntry, n  > {
         }
         assert( numEntriesOfSameValue <= 1);
     }
-
-
+    
+    
     void stats() const {
         std::map<int, int> histogram;
         for(auto hashTableValIt = hashTable.begin(); hashTableValIt != hashTable.end(); ++hashTableValIt ) {
@@ -156,7 +156,7 @@ struct Hash< cv::Point2f,HashEntry, n  > {
             std::cout << mit->first << ", " << mit->second << std::endl;
         }
     }
-
+    
     std::normal_distribution<> ndist;
     std::uniform_real_distribution<K> udist;
     std::mt19937 gen;
@@ -177,11 +177,11 @@ struct std::less<cv::Point2f> : std::binary_function< cv::Point2f, cv::Point2f, 
     EpsilonEq<I> epsilonEq;
     bool operator()(const cv::Point2f &l, const cv::Point2f &r) {
         bool b = ( !epsilonEq(l.x, r.x ) )?
-                    (l.x < r.x) :
-                    ( !epsilonEq(l.y, r.y ) ?
-                        (l.y < r.y):
-                        false
-                    );
+        (l.x < r.x) :
+        ( !epsilonEq(l.y, r.y ) ?
+         (l.y < r.y):
+         false
+         );
         return b;
     }
 };
@@ -192,8 +192,8 @@ struct ContourRepresentativePoint;
 
 class SpotIt {
 public:
-    SpotIt( std::vector< std::function<void(char)>> *pHandleToKeyboardFun,
-     std::vector<std::function<void(int, int, int, int, void*)>> *pHandleToMouseFun);
+    SpotIt( std::vector< std::function<void(char)>> *pKeyboardCallbackRegistry,
+           std::vector<std::function<void(int, int, int, int, void*)>> *pMouseCallbackRegistry);
     
     ~SpotIt();
     //returns true if successfully processed the circle
@@ -202,10 +202,10 @@ public:
                        float circleRadius,
                        cv::Mat &inputImage,
                        cv::Mat &roiOutputImageCopy);
-
+    
     void readPointClusters(const std::string &filename, std::vector< std::vector< cv::Point2f > > &ptClusters);
     void writePointClusters(const std::string &filename, const std::vector< std::vector< cv::Point2f > > &ptClusters);
-
+    
 protected:
     
     void cluster(
@@ -217,46 +217,46 @@ protected:
                  int &numClusters, //out
                  float &sse //out, sum of squared error
     );
-
-
+    
+    
     void drawOutput(
-                        const std::vector< std::vector<cv::Point>> &contours,
-                        const std::vector<bool> &shouldProcessContour,
-                        const std::vector<int> &clusterAssignments,
-                        const std::vector<ContourRepresentativePoint> &clusterCenters,
-                        const std::vector<cv::KeyPoint> &keyPoints,
-                        cv::Mat &inputImage,
-                        cv::Mat &roiOutputImage,
-                        float sse);
-
+                    const std::vector< std::vector<cv::Point>> &contours,
+                    const std::vector<bool> &shouldProcessContour,
+                    const std::vector<int> &clusterAssignments,
+                    const std::vector<ContourRepresentativePoint> &clusterCenters,
+                    const std::vector<cv::KeyPoint> &keyPoints,
+                    cv::Mat &inputImage,
+                    cv::Mat &roiOutputImage,
+                    float sse);
+    
     bool customInitialClusterAssignment( int k,
                                         const std::vector<ClusterItem> &items,
-
-                                            const std::vector< std::vector< cv::Point > > &contours,
-                                            const std::map<int, int> &indexRemapping,
+                                        
+                                        const std::vector< std::vector< cv::Point > > &contours,
+                                        const std::map<int, int> &indexRemapping,
                                         std::vector<ClusterItem> &clusterCenters,
                                         std::vector<int> &itemsScelected);
-
+    
     void extractFeaturesFromRoiOutput (cv::Mat &roiImage, std::vector<cv::KeyPoint> &outKeypoints);
-
+    
     void approximateCurves(
-        const std::vector<std::vector<cv::Point> > & inContours,
-        const std::vector<bool> &shouldProcessContour,
-        std::vector<std::vector<cv::Point2f> > & outContours ) ;
-
+                           const std::vector<std::vector<cv::Point> > & inContours,
+                           const std::vector<bool> &shouldProcessContour,
+                           std::vector<std::vector<cv::Point2f> > & outContours ) ;
+    
     void geometricHashBuilding(
-        const std::vector< std::vector< cv::Point2f> > & contours
-    );
-
+                               const std::vector< std::vector< cv::Point2f> > & contours
+                               );
+    
     bool handleKey(char keyChar) ;
     bool handleMouse( int event, int x, int y, int flags, void * userdata);
-
+    
     Kg::StatsMaker statsMakerMaxX;
     Kg::StatsMaker statsMakerMaxY;
     Kg::StatsMaker statsMakerMinX;
     Kg::StatsMaker statsMakerMinY;
-    std::vector< std::function<void(char)>> *pHandleToKeyboardFun;
-    std::vector<std::function<void(int, int, int, int, void*)>> *pHandleToMouseFun;
+    std::vector< std::function<void(char)>> *pKeyboardCallbackRegistry;
+    std::vector<std::function<void(int, int, int, int, void*)>> *pMouseCallbackRegistry;
     std::vector< std::vector<cv::Point2f> > approximatedContours;
     Hash< cv::Point2f, HashEntry, 3> hash;
     std::vector<std::vector<cv::Point2f>> pointClusters;
@@ -265,12 +265,12 @@ protected:
         std::string name;
         cv::Scalar  value;
         ColorScheme(const std::string &name, const cv::Scalar &col):
-            name(name),value(col){}
+        name(name),value(col){}
         ColorScheme(){}
     };
     std::vector<ColorScheme> colorSchemesForDrawing;
-    friend void keyBoardFun(SpotIt *p, char keyChar);
-    friend void mouseFun(SpotIt *p, int event, int x, int y, int flags, void * userdata);
+    friend void keyboardCallback(SpotIt *p, char keyChar);
+    friend void mouseCallback(SpotIt *p, int event, int x, int y, int flags, void * userdata);
 };
 
 

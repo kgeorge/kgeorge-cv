@@ -42,7 +42,7 @@ namespace Kg {
     T max( T a, T b ) {
         return a >= b ? a: b;
     }
-
+    
     //A utility class that collects float samples
     //and keeps track of current, mean, variance and numSamples
     struct StatsMaker {
@@ -61,11 +61,11 @@ namespace Kg {
             n +=1;
         }
         std::string name;
-
+        
         friend std::ostream &operator<< (std::ostream &o, const StatsMaker &s) {
             o << s.name << ": mu=" << s.mean << ": variance=" << s.variance <<  std::endl;
             return o;
-
+            
         }
     };
 }

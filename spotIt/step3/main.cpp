@@ -28,12 +28,12 @@ using namespace cv;
 
 
 
-vector<std::function<void(char)>> handleToKeyboardFun;
-vector<std::function<void(int, int, int, int, void*)>> handleToMouseFun;
+vector<std::function<void(char)>> keyboardCallbackRegistry;
+vector<std::function<void(int, int, int, int, void*)>> mouseCallbackRegistry;
 void key_callback(char keyChar, const Mat& roiOutputImage, bool &processNextFrame, bool &gracefulExit) {
-    if(handleToKeyboardFun.size() > 0) {
-        assert(handleToKeyboardFun.size() ==1);
-        handleToKeyboardFun[0](keyChar);
+    if(keyboardCallbackRegistry.size() > 0) {
+        assert(keyboardCallbackRegistry.size() ==1);
+        keyboardCallbackRegistry[0](keyChar);
     }
     switch( keyChar ) {
         case 's':
@@ -59,9 +59,9 @@ void mouseCallBackFunc(int event, int x, int y, int flags, void* userdata)
      //EVENT_RBUTTONDOWN
      //EVENT_MBUTTONDOWN
      //EVENT_MOUSEMOVE
-      if(handleToMouseFun.size() > 0) {
-        assert(handleToMouseFun.size() ==1);
-        handleToMouseFun[0](event, x, y, flags, userdata);
+      if(mouseCallbackRegistry.size() > 0) {
+        assert(mouseCallbackRegistry.size() ==1);
+        mouseCallbackRegistry[0](event, x, y, flags, userdata);
      }
 }
 
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     
     
     Mat roiOutputImageLast;
-    SpotIt spotIt(&handleToKeyboardFun, &handleToMouseFun);
+    SpotIt spotIt(&keyboardCallbackRegistry, &mouseCallbackRegistry);
     bool processNextFrame = true;
     bool gracefulExit = false;
     for(; !gracefulExit  ;) {

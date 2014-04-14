@@ -25,8 +25,8 @@ template<typename K>
 struct Quantizer {
     static const K kEpsilon_;
     Quantizer(K eps=kEpsilon_):
-        m_fEps(eps)
-        {}
+    m_fEps(eps)
+    {}
     K operator()( K valIn ) const
     {
         return round(valIn);
@@ -78,23 +78,23 @@ struct KgGeometricHashing_Traits {
     static K distSqrd(const T &l, const T &r) {
         throw std::runtime_error( "not implemented" );
     }
-
+    
     static T orthogonal(const T &) {
         throw std::runtime_error( "not implemented" );
     }
-
+    
     static K dot(const T &l, const T &t) {
         throw std::runtime_error( "not implemented" );
     }
     static T &negate(T) {
         throw std::runtime_error( "not implemented" );
     }
-
+    
     //returns  -1 for left, 0 for on , +1 for right
     static int leftRightOrOn(const T &a, const T &b, const T &c) {
         throw std::runtime_error( "not implemented" );
     }
-
+    
     friend T & operator * ( T &l, K s) {
         throw std::runtime_error( "not implemented" );
     }
@@ -145,16 +145,16 @@ struct TemplateExtra_ {
     K maxDistSqrdBetweenPoints_;
     K avgDistSqrdBetweenPoints_;
     K varianceDistSqrd_;
-
+    
     TemplateExtra_():
     minDistSqrdBetweenPoints_(std::numeric_limits<K>::max()),
     maxDistSqrdBetweenPoints_(-std::numeric_limits<K>::max()),
-        avgDistSqrdBetweenPoints_(0),
-        varianceDistSqrd_(0){}
-
+    avgDistSqrdBetweenPoints_(0),
+    varianceDistSqrd_(0){}
+    
     template<typename ForwardIter>
     void compute(ForwardIter b, ForwardIter e);
-
+    
 };
 
 
@@ -187,20 +187,20 @@ class KgGeometricHashing {
 public:
     //Eg: if the template type is a vector of Point-s
     //T is Point
-
+    
     typedef typename TTemplate::value_type T;
     typedef  KgGeometricHashing_Traits<T> TTraits;
     typedef typename TTraits::K K;
-
+    
     KgGeometricHashing(){
-
+        
         maxValX = -std::numeric_limits<K>::max();
         minValX = std::numeric_limits<K>::max();
-
+        
         maxValY = -std::numeric_limits<K>::max();
         minValY = std::numeric_limits<K>::max();
     }
-
+    
     //ForwardIter value_type should be TTemplate
     template<typename ForwardIter>
     KgGeometricHashing(ForwardIter b, ForwardIter e){
@@ -212,7 +212,7 @@ public:
         minValY = std::numeric_limits<K>::max();
         addTemplates(b, e);
     }
-
+    
     //ForwardIter value_type should be TTemplate
     template<typename ForwardIter>
     void addTemplates( ForwardIter b, ForwardIter e ) {
@@ -222,26 +222,26 @@ public:
             b++;
         }
     }
-
+    
     ~KgGeometricHashing(){
         queue_.clear();
     }
-
+    
     template<typename HashEntry>
     void processTemplateSet(K w, Hash<T, HashEntry, 3> &hash);
-
+    
     K maxValX;
     K minValX;
-
+    
     K maxValY;
     K minValY;
-
+    
 protected:
     //note that we keep pointers to the point set
     //Eg: if you keep your Template as a vector of Points,
     //we keep a pointer to the template.
     std::deque<const TTemplate *> queue_;
-
+    
     //computed during processTemplate
     std::deque< TemplateExtra_<TTemplate,TTraits> > templateExtras_;
 };
@@ -266,7 +266,7 @@ void KgGeometricHashing<TTemplate, Q >::processTemplateSet(K w, Hash<T, HashEntr
             }
             templateCentroid = templateCentroid  * reciprocal;
         }
-
+        
         for(auto pointIt =  t->begin(); pointIt != t->end(); ++pointIt ) {
             auto nextPointIt = pointIt + 1;
             for( ; nextPointIt != t->end(); ++nextPointIt) {
@@ -276,7 +276,7 @@ void KgGeometricHashing<TTemplate, Q >::processTemplateSet(K w, Hash<T, HashEntr
                     if( isLeftRightOrOn == 0) {
                         continue;
                     } else if( isLeftRightOrOn > 1) {
-                         std::swap(l, r);
+                        std::swap(l, r);
                     }
                     T diff = r-l;
                     T centroidOfBase = (r + l) * static_cast<K>(0.5);
@@ -287,10 +287,10 @@ void KgGeometricHashing<TTemplate, Q >::processTemplateSet(K w, Hash<T, HashEntr
                     T yAxis = TTraits::orthogonal(diff) * oneByLngth;
                     T xAxisNeg(xAxis);
                     T yAxisNeg(yAxis);
-
+                    
                     TTraits::negate(xAxisNeg);
                     TTraits::negate(yAxisNeg);
-
+                    
                     auto allPointsIt = t->begin();
                     for( allPointsIt = t->begin(); allPointsIt != t->end(); ++allPointsIt ) {
                         const T &currentPoint = *allPointsIt;
@@ -304,7 +304,7 @@ void KgGeometricHashing<TTemplate, Q >::processTemplateSet(K w, Hash<T, HashEntr
                         minValY = (quantizer(projection.y) < minValY) ? quantizer(projection.y) : minValY;
                         HashEntry he(*pointIt, *nextPointIt);
                         //hash.index(projection, he);
-
+                        
                     }
                 }
                 
@@ -313,7 +313,7 @@ void KgGeometricHashing<TTemplate, Q >::processTemplateSet(K w, Hash<T, HashEntr
     }
     //std::cout << "///////////////////////////////////////////////////" << std::endl;
     //std::cout << "maximum:  x: " << maxValX <<  ", " << maxValY << ", minimum: " << minValX <<   ",  " << minValY << std::endl;
-
+    
 }
 
 #endif //KG_GEOMETRIC_HASHING_H_
