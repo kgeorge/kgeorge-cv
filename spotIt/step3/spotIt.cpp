@@ -146,23 +146,27 @@ bool SpotIt::processCircle(
             numClusters,  //number of clusters,
             sse //sum of squared error
             );
-    
-    map<int, int> numPointsForEachCluster;
-    for(int i=0; i < numClusters; ++i) {
-        numPointsForEachCluster[i] =0;
-    }
-    for(int i=0; i < contours.size(); ++i ) {
-        vector<Point> &contour = contours[i];
-        if( shouldProcessContour[i]) {
-            int clusterId = clusterAssignments[i];
-            assert(clusterId >= 0);
-            numPointsForEachCluster[clusterId] += contour.size();
-        }
-    }
+
     
     
     vector<vector<Point2f>> approximatedContours(contours.size());
     approximateCurves( contours, shouldProcessContour,  approximatedContours  );
+
+
+
+    map<int, int> numPointsForEachCluster;
+    for(int i=0; i < numClusters; ++i) {
+        numPointsForEachCluster[i] =0;
+    }
+    for(int i=0; i < approximatedContours.size(); ++i ) {
+        vector<Point2f> &contour = approximatedContours[i];
+        if( shouldProcessContour[i]) {
+            int clusterId = clusterAssignments[i];
+            assert(clusterId >= 0);
+            numPointsForEachCluster[clusterId] += approximatedContours[i].size();
+        }
+    }
+
     //draw the output onto the output images
     roiOutputImage.create(roiGrayImage.size(), inputImage.type() );
     roiOutputImage = Scalar(0,0,0);
@@ -199,9 +203,6 @@ bool SpotIt::processCircle(
                inputImage,
                roiOutputImage,
                sse);
-    
-   
-    geometricHashBuilding( pointClusters);
 
     return true;
 }
@@ -213,7 +214,7 @@ void SpotIt::geometricHashBuilding(
     {
     //KgGeometricHashing<vector<Point2f>,  Quantizer<float>, KgGeometricHashing_Traits< vector<Point2f> > > geomHash(contours.begin(), contours.end());
     KgGeometricHashing<vector<Point2f>,  Quantizer<float> >  geomHash(contours.begin(), contours.end());
-    geomHash.processTemplateSet(0.16f);
+    geomHash.processTemplateSet(0.16f, hash);
     statsMakerMaxX.addSample(geomHash.maxValX);
     statsMakerMaxY.addSample(geomHash.maxValY);
     statsMakerMinX.addSample(geomHash.minValX);
@@ -724,28 +725,17 @@ void SpotIt::drawOutput(
     //make random colors for displaying
     static RNG rng1(12345), rng2(54321);
     static const Scalar colorMark[] = {
-        Scalar(255, 0, 0),
-        Scalar(0, 255, 0),
-        Scalar(0, 0, 255),
-        Scalar(255, 255, 0),
-        Scalar(255, 0, 255),
-        Scalar(0, 255, 255),
-        Scalar( rng1.uniform(128, 255), rng1.uniform(128,255), rng1.uniform(128,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(128,255) ),
-        Scalar( rng1.uniform(128, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(128,255), rng1.uniform(128,255) ),
-        Scalar( rng1.uniform(60, 255), rng1.uniform(60,255), rng1.uniform(60,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) ),
-        Scalar( rng1.uniform(0, 255), rng1.uniform(0,255), rng1.uniform(0,255) )
-
+        Scalar(255, 0, 0), //blue
+        Scalar(0, 0, 255), //red
+        Scalar(0, 255, 0), //green
+        Scalar(0, 255, 255), //yellow
+        Scalar(255, 0, 255), //purple
+        Scalar(255, 255, 0), //cyan
+        Scalar(196, 228, 255), //bisque
+        Scalar(0, 128, 128), //olive
+        Scalar(235, 206, 135), //skyblue
+        Scalar(0, 165, 255), //orange
+        Scalar(47, 255, 173), //lime green
     };
 
     for(int i=0; i < contours.size(); ++i) {

@@ -66,28 +66,93 @@ struct KgGeometricHashing_Traits< cv::Point2f >{
 };
 
 
+struct HashEntry {
+    cv::Point2f l;
+    cv::Point2f r;
+    int count;
+    HashEntry(const cv::Point2f &l, const cv::Point2f &r):
+        l(l), r(r), count(0){}
+    HashEntry():count(0){}
+    bool operator==(const HashEntry &h) {
+        return h.l == l && h.r == r;
+    }
+};
+
+struct HashTableValue {
+    std::deque< HashEntry > data;
+};
 
 
-template<int n>
-struct Hash< cv::Point2f, n  > {
+template<typename HashEntry, int n>
+struct Hash< cv::Point2f,HashEntry, n  > {
     typedef cv::Point2f T;
     typedef KgGeometricHashing_Traits< cv::Point2f > TTraits;
     typedef typename T::value_type I;
     typedef typename AppropriateNonIntegralType<I>::value_type K;
     static constexpr K zero = static_cast<K>(0);
     static constexpr K one = static_cast<K>(1);
-    Hash(K w):w(w),oneByW(one/w),gen(42),ndist(std::normal_distribution<>(zero, one)),udist(zero, w) {
+    Hash(K w):w(w),numEntries(0),oneByW(one/w),gen(42),ndist(std::normal_distribution<>(zero, one)),udist(zero, w),hashTable(160*160*160) {
         for(int i=0; i < n; ++i) {
             a[i] = cv::Point2f(ndist(gen), ndist(gen));
             b[i] = udist(gen);
         }
     }
 
-    void operator()( const T &arg, int ret[n]) {
+    int findIndex( int ret[n]) {
+        return ret[2] * 160 * 160 + ret[1] * 160 + ret[0];
+    }
+
+    void index( const T &arg, const HashEntry & entry) {
         K temp;
         for(int i=0; i < n; ++i) {
             temp = TTraits::dot(a[i], arg) + b[i];
             ret[i] = floor(temp * oneByW);
+            assert(ret[i] >= -80 && ret[i] <= 80);
+            ret[i] += 80;
+            assert(ret[i] > 0);
+        }
+        int hashTableIndex = findIndex(ret);
+        assert(hashTableIndex < hashTable.size());
+        HashTableValue &hashTableVal = hashTable[hashTableIndex];
+        auto hit = hashTableVal.data.begin();
+        int numEntriesOfSameValue =0;
+        bool found = false;
+        for(hit = hashTableVal.data.begin(); hit != hashTableVal.data.end(); ++hit) {
+            if( *hit == entry ) {
+                hit->count++;
+                numEntriesOfSameValue++;
+                found = true;
+            }
+        }
+        if(!found) {
+            hashTableVal.data.push_back(entry);
+            ++numEntries;
+            if(((numEntries % 100) == 0) && (numEntries >= 100)) {
+                //stats();
+            }
+        }
+        assert( numEntriesOfSameValue <= 1);
+    }
+
+
+    void stats() const {
+        std::map<int, int> histogram;
+        for(auto hashTableValIt = hashTable.begin(); hashTableValIt != hashTable.end(); ++hashTableValIt ) {
+            int n2 = 0;
+            for(auto hoit = hashTableValIt->data.begin(); hoit!= hashTableValIt->data.end(); ++hoit ) {
+                n2 += hoit->count;
+            }
+            n2 /= 10;
+            auto histIt = histogram.find(n2);
+            if (histIt == histogram.end()) {
+                histogram.insert( std::pair<int, int>(n2, 1));
+            } else {
+                histIt->second += 1;
+            }
+        }
+        std::cout << "histogram of hashTbale" << std::endl;
+        for(auto mit = histogram.begin(); mit != histogram.end(); ++mit) {
+            std::cout << mit->first << ", " << mit->second << std::endl;
         }
     }
 
@@ -98,6 +163,9 @@ struct Hash< cv::Point2f, n  > {
     K b[n];
     K w;
     K oneByW;
+    int ret[n];
+    std::deque<HashTableValue> hashTable;
+    int numEntries;
 };
 
 
@@ -127,7 +195,8 @@ public:
     statsMakerMaxX("maxX"),
     statsMakerMaxY("maxY"),
     statsMakerMinX("minX"),
-    statsMakerMinY("minY"){}
+    statsMakerMinY("minY"),
+    hash(1.0){}
     
     ~SpotIt(){}
     //returns true if successfully processed the circle
@@ -183,6 +252,9 @@ protected:
     Kg::StatsMaker statsMakerMaxY;
     Kg::StatsMaker statsMakerMinX;
     Kg::StatsMaker statsMakerMinY;
+
+    std::vector< std::vector<cv::Point2f> > approximatedContours;
+    Hash< cv::Point2f, HashEntry, 3> hash;
 };
 
 
