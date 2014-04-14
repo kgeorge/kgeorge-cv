@@ -29,8 +29,17 @@ using namespace std::placeholders;
 
 //wrapper for OGLAugmentedScene::_handleKey
 void keyBoardFun(SpotIt *p, char keyChar) {
-    p->handleKey(keyChar);
-    p->pHandleToKeyboardFun->clear();
+    bool bVal = p->handleKey(keyChar);
+    if(bVal) {
+        p->pHandleToKeyboardFun->clear();
+    }
+}
+
+
+
+
+void mouseFun(SpotIt *p, int event, int x, int y, int flags, void * userdata) {
+     p->handleMouse( event, x, y, flags, userdata);
 }
 
 template<>
@@ -42,18 +51,25 @@ const double Quantizer<double>::kEpsilon_ = 0.00000000001;
 
 
 
-   SpotIt::SpotIt( std::vector< std::function<void(char)>> *pHandleToKeyboardFun):
+   SpotIt::SpotIt( std::vector< std::function<void(char)>> *pHandleToKeyboardFun, std::vector<std::function<void(int, int, int, int, void*)>> *pHandleToMouseFun):
     statsMakerMaxX("maxX"),
     statsMakerMaxY("maxY"),
     statsMakerMinX("minX"),
     statsMakerMinY("minY"),
     hash(1.0),
-    pHandleToKeyboardFun(pHandleToKeyboardFun){
+    pHandleToKeyboardFun(pHandleToKeyboardFun),
+    pHandleToMouseFun(pHandleToMouseFun){
          //register keyboard function
          if( pHandleToKeyboardFun ) {
             std::function<void(char)> boundKeyboardFunBody = std::bind(keyBoardFun, this, _1 );
             pHandleToKeyboardFun->push_back(boundKeyboardFunBody);
-       }
+         }
+
+         if( pHandleToMouseFun ) {
+            std::function<void(int, int, int, int, void *)> boundMouseFunBody = std::bind(mouseFun, this, _1, _2, _3, _4, _5 );
+            pHandleToMouseFun->push_back(boundMouseFunBody);
+         }
+
         
         colorSchemesForDrawing.reserve(11);
         colorSchemesForDrawing.push_back( ColorScheme("blue", Scalar(255, 0, 0)) );
@@ -74,6 +90,10 @@ const double Quantizer<double>::kEpsilon_ = 0.00000000001;
      SpotIt::~SpotIt( ) {
      if(  pHandleToKeyboardFun ) {
         pHandleToKeyboardFun->clear();
+         }
+
+     if(  pHandleToMouseFun ) {
+        pHandleToMouseFun->clear();
          }
     }
 
@@ -154,7 +174,6 @@ bool SpotIt::processCircle(
             }
         }
         double avgDistSqFromCircle = sumDistSqFromCircle /contour.size();
-        double varianceDistSqFromCircle = sumSqDistSqFromCircle /contour.size() - avgDistSqFromCircle * avgDistSqFromCircle;
         double percentageNumPointsInCircle = (double)numPointsInCircle * 100.0/ contour.size();
         //if 90% of pointsof contour falls within the circle,
         //then this is a contour that need be further processed
@@ -205,7 +224,6 @@ bool SpotIt::processCircle(
         numPointsForEachCluster[i] =0;
     }
     for(int i=0; i < approximatedContours.size(); ++i ) {
-        vector<Point2f> &contour = approximatedContours[i];
         if( shouldProcessContour[i]) {
             int clusterId = clusterAssignments[i];
             assert(clusterId >= 0);
@@ -233,12 +251,23 @@ bool SpotIt::processCircle(
             vector<Point2f> &approxContour = approximatedContours[i];
             outContours[i].resize( approxContour.size());
             int clusterId = clusterAssignments[i];
-            int numPointsInClusterSoFar = pointClusters[clusterId].size();
             for(int j=0; j < approxContour.size(); ++j) {
                 outContours[i][j] = Point( round(approxContour[j].x), round(approxContour[j].y));
                 pointClusters[clusterId].push_back( approxContour[j] );
             }
         }
+    }
+    pointClusterCentroids.resize(pointClusters.size());
+    for(int i=0; i < pointClusters.size(); ++i) {
+        const vector<Point2f> &pointCluster = pointClusters[i];
+        Point2f pointClusterCentroid(0,0);
+        for(int j=0; j < pointCluster.size(); ++j) {
+            pointClusterCentroid += pointCluster[j];
+        }
+        if(pointCluster.size() > 0) {
+            pointClusterCentroid *= 1.0f / pointCluster.size();
+        }
+        pointClusterCentroids[i] = pointClusterCentroid;
     }
     
     drawOutput(
@@ -292,6 +321,14 @@ void SpotIt::extractFeaturesFromRoiOutput (Mat &roiImage, vector<KeyPoint> &keyp
             const vector<Point2f> &ptCluster = ptClusters[i];
             fs << "{";
             fs << "id" << i;
+            fs << "comment" << "no comments";
+            fs << "score" << "{";
+                fs << "outlineOnly" << 80;
+                fs << "noNoise" << 100;
+                fs << "bigSize" << 50;
+                fs << "color" << colorSchemesForDrawing[i].name;
+                fs << "connectedness" << 100;
+            fs << "}";
             fs << "name" << colorSchemesForDrawing[i].name;
             fs <<"cluster";
             fs << "[";
@@ -324,6 +361,18 @@ void SpotIt::extractFeaturesFromRoiOutput (Mat &roiImage, vector<KeyPoint> &keyp
             int id = (*it)["id"];
             string name = (*it)["name"];
             FileNode ncl = (*it)["cluster"];
+            string comment = (*it)["comment"];
+            FileNode sc = (*it) ["score"];
+            int outlineOnly =0;
+            outlineOnly << (int)sc["outlineOnly"];
+            int noise =0;
+            noise << (int)sc["noNoise"];
+            int connectedness =0;
+            connectedness << (int)sc["connectedness"];
+            int bigSize =0;
+            bigSize << (int)sc["bigSize"];
+            string color;
+            color  = (string)sc["color"];
              if (ncl.type() != FileNode::SEQ)
             {
                 cerr << "strings is not a sequence! FAIL" << endl;
@@ -342,19 +391,47 @@ void SpotIt::extractFeaturesFromRoiOutput (Mat &roiImage, vector<KeyPoint> &keyp
     }
 
 
-    void SpotIt::handleKey(char keyChar) {
-        std::cout << "SpotIt::handling key char: " << keyChar <<  std::endl;
-
+    bool SpotIt::handleKey(char keyChar) {
+        bool retVal = false;
     switch( keyChar ) {
         case 'c':
         case 'C':
+            std::cout << "SpotIt::handling key char: " << keyChar <<  std::endl;
             writePointClusters("pointCluster.xml", pointClusters);
             //write the pointCluster to a file
             //save the output image in current directory
+            retVal = true;
             break;
         default:
             break;
     }
+    return retVal;
+    }
+
+
+
+    bool SpotIt::handleMouse( int event, int x, int y, int flags, void * userdata) {
+        bool retVal = true;
+
+
+     if  ( event == EVENT_LBUTTONDOWN )
+     {
+        //select the nearest pointClusterCentroid
+        Point2f mousePoint(x, y);
+        float minDistSq = numeric_limits<float>::max();
+        int whichClusterIdx=-1;
+        for(int i=0; i < pointClusterCentroids.size(); ++i) {
+            Point2f distanceFromCluster =  pointClusterCentroids[i] - mousePoint;
+            float distSq = distanceFromCluster.x * distanceFromCluster.x + distanceFromCluster.y * distanceFromCluster.y;
+            if( distSq < minDistSq ) {
+                minDistSq = distSq;
+                whichClusterIdx = i;
+            }
+        }
+        assert(whichClusterIdx >= 0);
+        std::cout << "selected cluster: "  << colorSchemesForDrawing[whichClusterIdx].name.c_str() << std::endl;
+     }
+        return retVal;
     }
 
 void SpotIt::approximateCurves(

@@ -250,15 +250,12 @@ protected:
 template< typename TTemplate, typename Q>
 template<typename HashEntry>
 void KgGeometricHashing<TTemplate, Q >::processTemplateSet(K w, Hash<T, HashEntry, 3> &hash) {
-    int hashResult[3];
-
     for(auto qit= queue_.begin(); qit != queue_.end(); ++qit) {
         const TTemplate *t = *qit;
         TemplateExtra_<TTemplate, TTraits> extra;
         extra.compute(t->begin(), t->end());
         std::less< T > lessT;
         Q quantizer;
-        int t_size = t->size();
         K limitDistanceBetweenPoints =  4;
         T templateCentroid;
         if(t->begin() != t->end()) {

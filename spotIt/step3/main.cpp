@@ -29,6 +29,7 @@ using namespace cv;
 
 
 vector<std::function<void(char)>> handleToKeyboardFun;
+vector<std::function<void(int, int, int, int, void*)>> handleToMouseFun;
 void key_callback(char keyChar, const Mat& roiOutputImage, bool &processNextFrame, bool &gracefulExit) {
     if(handleToKeyboardFun.size() > 0) {
         assert(handleToKeyboardFun.size() ==1);
@@ -52,6 +53,19 @@ void key_callback(char keyChar, const Mat& roiOutputImage, bool &processNextFram
     }
 }
 
+
+void mouseCallBackFunc(int event, int x, int y, int flags, void* userdata)
+{
+     //EVENT_RBUTTONDOWN
+     //EVENT_MBUTTONDOWN
+     //EVENT_MOUSEMOVE
+      if(handleToMouseFun.size() > 0) {
+        assert(handleToMouseFun.size() ==1);
+        handleToMouseFun[0](event, x, y, flags, userdata);
+     }
+}
+
+
 int main(int argc, char **argv) {
     
     //initialize the random number generator
@@ -60,10 +74,12 @@ int main(int argc, char **argv) {
     VideoCapture cap(0);
     //video shows the current scene
     namedWindow( "video");
+
+    setMouseCallback("video", mouseCallBackFunc, NULL);
     
     
     Mat roiOutputImageLast;
-    SpotIt spotIt(&handleToKeyboardFun);
+    SpotIt spotIt(&handleToKeyboardFun, &handleToMouseFun);
     bool processNextFrame = true;
     bool gracefulExit = false;
     for(; !gracefulExit  ;) {

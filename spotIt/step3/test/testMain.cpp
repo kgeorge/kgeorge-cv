@@ -45,7 +45,7 @@ TEST( SpotIt, Write) {
 
     ptClusters[1].reserve(1);
     ptClusters[1].push_back(Point2f(100, 100));
-    SpotIt sp(NULL);
+    SpotIt sp(NULL, NULL);
     sp.writePointClusters("foo.xml", ptClusters);
 
     vector< vector< Point2f > > ptClusters2;

@@ -192,7 +192,8 @@ struct ContourRepresentativePoint;
 
 class SpotIt {
 public:
-    SpotIt( std::vector< std::function<void(char)>> *pHandleToKeyboardFun );
+    SpotIt( std::vector< std::function<void(char)>> *pHandleToKeyboardFun,
+     std::vector<std::function<void(int, int, int, int, void*)>> *pHandleToMouseFun);
     
     ~SpotIt();
     //returns true if successfully processed the circle
@@ -247,16 +248,19 @@ protected:
         const std::vector< std::vector< cv::Point2f> > & contours
     );
 
-    void handleKey(char keyChar) ;
+    bool handleKey(char keyChar) ;
+    bool handleMouse( int event, int x, int y, int flags, void * userdata);
 
     Kg::StatsMaker statsMakerMaxX;
     Kg::StatsMaker statsMakerMaxY;
     Kg::StatsMaker statsMakerMinX;
     Kg::StatsMaker statsMakerMinY;
     std::vector< std::function<void(char)>> *pHandleToKeyboardFun;
+    std::vector<std::function<void(int, int, int, int, void*)>> *pHandleToMouseFun;
     std::vector< std::vector<cv::Point2f> > approximatedContours;
     Hash< cv::Point2f, HashEntry, 3> hash;
     std::vector<std::vector<cv::Point2f>> pointClusters;
+    std::vector<cv::Point2f> pointClusterCentroids;
     struct  ColorScheme {
         std::string name;
         cv::Scalar  value;
@@ -266,6 +270,7 @@ protected:
     };
     std::vector<ColorScheme> colorSchemesForDrawing;
     friend void keyBoardFun(SpotIt *p, char keyChar);
+    friend void mouseFun(SpotIt *p, int event, int x, int y, int flags, void * userdata);
 };
 
 
