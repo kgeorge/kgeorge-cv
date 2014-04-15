@@ -22,6 +22,11 @@ does some minimal clustering which need be improved.
 
 --The roiOutputImage of last processing would be overlayed on the top-left corner of video output
 
+--[geometric hashing](http://graphics.stanford.edu/courses/cs468-01-winter/papers/wr-ghao-97.pdf) where a query point set can be matched against a predefined set of well defined template point set, sounds promising here.
+[geometric hashing](http://graphics.stanford.edu/courses/cs468-01-winter/papers/wr-ghao-97.pdf) should find out partial matches and is invavriant to translation, rotation and scaling. We also implement,
+a variant of [locality sensitive hashing](http://www.mit.edu/~andoni/LSH) which is based in p-stable distributions, to implement the basic hashing functionality.
+
+
 
 
 ## After compiling, run this program as,

@@ -7,8 +7,11 @@
 	objects = {
 
 /* Begin PBXFileReference section */
+		C10F04C518FB8CDA007CAE9F /* testMain.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = testMain.cpp; path = ../../test/testMain.cpp; sourceTree = "<group>"; };
 		C125BE9018F4B4D60071CB2D /* HashSetPoint3.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HashSetPoint3.h; path = ../../HashSetPoint3.h; sourceTree = "<group>"; };
 		C125BE9118F4B4D60071CB2D /* HashSetPoint3Aux.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HashSetPoint3Aux.h; path = ../../HashSetPoint3Aux.h; sourceTree = "<group>"; };
+		C13873E618FDF49A000B9D57 /* kgKernel.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = kgKernel.hpp; path = ../../kgKernel.hpp; sourceTree = "<group>"; };
+		C13873E718FDF49A000B9D57 /* kgLocalitySensitiveHash.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = kgLocalitySensitiveHash.hpp; path = ../../kgLocalitySensitiveHash.hpp; sourceTree = "<group>"; };
 		C13FF8EA18F459FD000552B3 /* kgGeometricHashing.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = kgGeometricHashing.hpp; path = ../../kgGeometricHashing.hpp; sourceTree = "<group>"; };
 		C14337D218F0C32800AFD908 /* kgUtils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = kgUtils.hpp; path = ../../kgUtils.hpp; sourceTree = "<group>"; };
 		C14337D318F0C32800AFD908 /* kMeansClustering_detail.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = kMeansClustering_detail.hpp; path = ../../kMeansClustering_detail.hpp; sourceTree = "<group>"; };
@@ -23,6 +26,9 @@
 		C14337C718F0C31200AFD908 = {
 			isa = PBXGroup;
 			children = (
+				C13873E618FDF49A000B9D57 /* kgKernel.hpp */,
+				C13873E718FDF49A000B9D57 /* kgLocalitySensitiveHash.hpp */,
+				C10F04C518FB8CDA007CAE9F /* testMain.cpp */,
 				C125BE9018F4B4D60071CB2D /* HashSetPoint3.h */,
 				C125BE9118F4B4D60071CB2D /* HashSetPoint3Aux.h */,
 				C13FF8EA18F459FD000552B3 /* kgGeometricHashing.hpp */,

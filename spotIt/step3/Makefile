@@ -9,15 +9,15 @@ ifeq ($(DEBUG), 1)
 	#change this to point to your debug build of opencv
 	#
 	OPENCV_DEBUG_INSTALL_DIR=/Users/kgeorge/Documents/projects/opencv-2.4.8/build/debug
-	FORGIVING-CXXFLAGS=-Wno-reorder -D DEBUG -g3
+	FORGIVING-CXXFLAGS=-Wunused-variable -Wno-reorder -D DEBUG -g3
 	OPENCV-INCLUDES = /usr/local/include  $(OPENCV_DEBUG_INSTALL_DIR)/include
 	OPENCV-LIBS-DIR = $(OPENCV_DEBUG_INSTALL_DIR)/lib
 	# for now just use the release config
-	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/build/release
+	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/lib/release
 	GTEST-INCLUDES = -I$(GIT_ROOT)/thirdparty/gtest-1.7.0/include
 else
 	CONFIG=RELEASE
-	FORGIVING-CXXFLAGS=-Wno-reorder  -D NDEBUG
+	FORGIVING-CXXFLAGS=-Wno-unused-variable -Wno-reorder  -D NDEBUG
 	OPENCV-INCLUDES = $(shell /usr/local/bin/pkg-config --cflags opencv)
 	OPENCV-LIBS-DIR = $(shell /usr/local/bin/pkg-config --libs opencv | dirname `awk '{ print $$1 }'`)
 	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/lib/release

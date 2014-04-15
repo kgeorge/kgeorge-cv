@@ -56,7 +56,7 @@ statsMakerMaxX("maxX"),
 statsMakerMaxY("maxY"),
 statsMakerMinX("minX"),
 statsMakerMinY("minY"),
-hash(1.0),
+hash(1.0, -80, 80),
 pKeyboardCallbackRegistry(pKeyboardCallbackRegistry),
 pMouseCallbackRegistry(pMouseCallbackRegistry){
     //register keyboard function
@@ -174,6 +174,7 @@ bool SpotIt::processCircle(
             }
         }
         double avgDistSqFromCircle = sumDistSqFromCircle /contour.size();
+        double varianceDistSqFromCircle = sumSqDistSqFromCircle /contour.size() - avgDistSqFromCircle * avgDistSqFromCircle;
         double percentageNumPointsInCircle = (double)numPointsInCircle * 100.0/ contour.size();
         //if 90% of pointsof contour falls within the circle,
         //then this is a contour that need be further processed
@@ -284,13 +285,11 @@ bool SpotIt::processCircle(
 }
 
 
-void SpotIt::geometricHashBuilding(
-                                   const vector<vector<Point2f> > & contours
-                                   )
-{
-    //KgGeometricHashing<vector<Point2f>,  Quantizer<float>, KgGeometricHashing_Traits< vector<Point2f> > > geomHash(contours.begin(), contours.end());
-    KgGeometricHashing<vector<Point2f>,  Quantizer<float> >  geomHash(contours.begin(), contours.end());
-    geomHash.processTemplateSet(0.16f, hash);
+void SpotIt::geometricHashBuilding(vector<vector<Point2f> >::const_iterator b, vector<vector<Point2f> >::const_iterator e) {
+    hash.clear();
+    //KgGeometricHash<vector<Point2f>,  Quantizer<float>, KgGeometricHash_Traits< vector<Point2f> > > geomHash(contours.begin(), contours.end());
+    KgGeometricHash<vector<Point2f>,  Quantizer<float> >  geomHash(b, e);
+    geomHash.processTemplateSet(1.0f, hash);
     statsMakerMaxX.addSample(geomHash.maxValX);
     statsMakerMaxY.addSample(geomHash.maxValY);
     statsMakerMinX.addSample(geomHash.minValX);
@@ -352,8 +351,8 @@ void SpotIt::readPointClusters(const std::string &filename, std::vector< std::ve
     FileNode n = fs["clusters"];                         // Read string sequence - Get node
     if (n.type() != FileNode::SEQ)
     {
-        cerr << "strings is not a sequence! FAIL" << endl;
-        throw runtime_error("strings is not a sequence! FAIL");
+        cerr << "clusters is not a sequence! FAIL" << endl;
+        throw runtime_error("clusters is not a sequence! FAIL");
     }
     
     FileNodeIterator it = n.begin(), it_end = n.end(); // Go through the node
@@ -397,7 +396,8 @@ bool SpotIt::handleKey(char keyChar) {
         case 'c':
         case 'C':
             std::cout << "SpotIt::handling key char: " << keyChar <<  std::endl;
-            writePointClusters("pointCluster.xml", pointClusters);
+            hash.serialize("geomHash.xml");
+            //writePointClusters("pointCluster.xml", pointClusters);
             //write the pointCluster to a file
             //save the output image in current directory
             retVal = true;
@@ -428,8 +428,13 @@ bool SpotIt::handleMouse( int event, int x, int y, int flags, void * userdata) {
                 whichClusterIdx = i;
             }
         }
-        assert(whichClusterIdx >= 0);
-        std::cout << "selected cluster: "  << colorSchemesForDrawing[whichClusterIdx].name.c_str() << std::endl;
+        if(whichClusterIdx >= 0) {
+            assert(whichClusterIdx >= 0);
+            std::cout << "selected cluster: "  << colorSchemesForDrawing[whichClusterIdx].name.c_str() << std::endl;
+            auto whichClusterIter =  pointClusters.begin() + whichClusterIdx;
+            geometricHashBuilding(whichClusterIter, whichClusterIter+1 );
+        }
+
     }
     return retVal;
 }
