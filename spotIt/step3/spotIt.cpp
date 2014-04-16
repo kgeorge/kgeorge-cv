@@ -284,6 +284,11 @@ bool SpotIt::processCircle(
     return true;
 }
 
+void SpotIt::geometricHashBuilding( int pointClusterIndex) {
+    auto whichClusterIter =  pointClusters.begin() + pointClusterIndex;
+    geometricHashBuilding(whichClusterIter, whichClusterIter+1 );
+    lsHash.colorName = colorSchemesForDrawing[pointClusterIndex].name;
+}
 
 void SpotIt::geometricHashBuilding(vector<vector<Point2f> >::const_iterator b, vector<vector<Point2f> >::const_iterator e) {
     lsHash.clear();
@@ -396,7 +401,7 @@ bool SpotIt::handleKey(char keyChar) {
         case 'c':
         case 'C':
             std::cout << "SpotIt::handling key char: " << keyChar <<  std::endl;
-            lsHash.serialize("geomHash.xml");
+            lsHash.serialize("geomHash.xml" );
             //writePointClusters("pointCluster.xml", pointClusters);
             //write the pointCluster to a file
             //save the output image in current directory
@@ -429,10 +434,7 @@ bool SpotIt::handleMouse( int event, int x, int y, int flags, void * userdata) {
             }
         }
         if(whichClusterIdx >= 0) {
-            assert(whichClusterIdx >= 0);
-            std::cout << "selected cluster: "  << colorSchemesForDrawing[whichClusterIdx].name.c_str() << std::endl;
-            auto whichClusterIter =  pointClusters.begin() + whichClusterIdx;
-            geometricHashBuilding(whichClusterIter, whichClusterIter+1 );
+            geometricHashBuilding(whichClusterIdx);
         }
 
     }

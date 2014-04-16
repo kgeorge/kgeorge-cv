@@ -94,10 +94,6 @@ struct LSHashEntryForGeometricHash {
     void read(const cv::FileNode &node) {
         node["left"] >> l;
         node["right"] >> r;
-        /*
-        l = (cv::Point2f)node["left"];
-        r = (cv::Point2f)node["right"];
-        */
         count = (int)node["count"];
     }
 };
@@ -140,6 +136,53 @@ typedef LocalitySensitiveHash<
     3,
     KgLocalitySensitiveHash_Traits< cv::Point2f >
     > SpotItLocalitySensitiveHashBase;
+
+//use a derived class for proper serialization of the hashtable
+struct SpotItLocalitySensitiveHash : public SpotItLocalitySensitiveHashBase {
+    typedef float K;
+    SpotItLocalitySensitiveHash(K w, K minRange, K maxRange):SpotItLocalitySensitiveHashBase(w,minRange, maxRange){}
+    SpotItLocalitySensitiveHash():SpotItLocalitySensitiveHashBase(){}
+
+    void serialize(const std::string &filename) const{
+        cv::FileStorage fs(filename, cv::FileStorage::WRITE);
+        if (!fs.isOpened())
+        {
+            std::cerr << "Failed to open " << filename << std::endl;
+            throw std::runtime_error("failed to open file");
+        }
+        fs << "SpotItHash";
+        fs << "{";
+
+        fs << "score" << "{";
+        fs << "outlineOnly" << 100;
+        fs << "noNoise" << 100;
+        fs << "bigSize" << 50;
+        fs << "color" << colorName;
+        fs << "connectedness" << 100;
+        fs << "}";
+        fs << "name" << colorName;
+        fs << "hashTable";
+
+        SpotItLocalitySensitiveHashBase::serialize(fs);
+        fs << "}";
+        fs.release();
+    }
+    void unSerialize(const std::string &filename) {
+        cv::FileStorage fs(filename, cv::FileStorage::READ);
+        if (!fs.isOpened())
+        {
+            std::cerr << "Failed to open " << filename << std::endl;
+            throw std::runtime_error("failed to open file");
+        }
+        cv::FileNode fn = fs["SpotItHash"];
+        cv::FileNode score = fn["score"];
+        std::string name = (std::string)fn["name"];
+        cv::FileNode fn_hashtable = fn["HashTable"];
+        SpotItLocalitySensitiveHashBase::unSerialize(fn_hashtable);
+        fs.release();
+    }
+    std::string colorName;
+};
 
 class SpotIt {
 public:
@@ -195,7 +238,7 @@ protected:
                            const std::vector<bool> &shouldProcessContour,
                            std::vector<std::vector<cv::Point2f> > & outContours ) ;
     
-
+    void geometricHashBuilding( int pointClusterIndex);
     void geometricHashBuilding(std::vector<std::vector<cv::Point2f> >::const_iterator b, std::vector<std::vector<cv::Point2f> >::const_iterator e);
     
     bool handleKey(char keyChar) ;
@@ -208,7 +251,7 @@ protected:
     std::vector< std::function<void(char)>> *pKeyboardCallbackRegistry;
     std::vector<std::function<void(int, int, int, int, void*)>> *pMouseCallbackRegistry;
     std::vector< std::vector<cv::Point2f> > approximatedContours;
-    SpotItLocalitySensitiveHashBase lsHash;
+    SpotItLocalitySensitiveHash lsHash;
     std::vector<std::vector<cv::Point2f>> pointClusters;
     std::vector<cv::Point2f> pointClusterCentroids;
     struct  ColorScheme {

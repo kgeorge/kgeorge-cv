@@ -86,10 +86,19 @@ TEST( LocalitySensitiveHashing, Serialization1) {
     hashEngine.index(pt2, he2);
 
     const std::string fname("testhash1.xml");
-    hashEngine.serialize(fname);
-    
+    {
+        cv::FileStorage fs(fname, cv::FileStorage::WRITE);
+        fs << "HashTable";
+        hashEngine.serialize(fs);
+        fs.release();
+    }
     LocalitySensitiveHash<Point2f, TestHashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
-    hashEngine2.unSerialize(fname);
+    {
+        cv::FileStorage fs(fname, cv::FileStorage::READ);
+        FileNode fn = fs["HashTable"];
+        hashEngine2.unSerialize(fn);
+        fs.release();
+    }
     EXPECT_EQ(hashEngine.w, hashEngine2.w);
     EXPECT_EQ(hashEngine.oneByW, hashEngine2.oneByW);
     EXPECT_EQ(hashEngine.minRange, hashEngine2.minRange);
@@ -111,12 +120,23 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
     hashEngine.index(pt1, he1);
     hashEngine.index(pt1, he1);
     hashEngine.index(pt2, he2);
-    
+
+
     const std::string fname("testhash2.xml");
-    hashEngine.serialize(fname);
-    
+    {
+        cv::FileStorage fs(fname, cv::FileStorage::WRITE);
+        fs << "HashTable";
+        hashEngine.serialize(fs);
+        fs.release();
+    }
     LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
-    hashEngine2.unSerialize(fname);
+
+    {
+        cv::FileStorage fs(fname, cv::FileStorage::READ);
+        cv::FileNode fn = fs["HashTable"];
+        hashEngine2.unSerialize(fn);
+        fs.release();
+    }
     EXPECT_EQ(hashEngine.w, hashEngine2.w);
     EXPECT_EQ(hashEngine.oneByW, hashEngine2.oneByW);
     EXPECT_EQ(hashEngine.minRange, hashEngine2.minRange);

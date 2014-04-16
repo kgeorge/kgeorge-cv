@@ -128,9 +128,9 @@ struct LocalitySensitiveHash {
         numEntries=0;
     }
 
-    void serialize(const std::string &filename) {
-        cv::FileStorage fs(filename, cv::FileStorage::WRITE);
-        fs << "hashTable" << "{";
+    void serialize(cv::FileStorage &fs) const{
+        assert(fs.isOpened());
+        fs << "{";
         fs << "description" << "geometric hash";
         fs << "numBuckets" << numBuckets;
         fs << "minRange" << minRange;
@@ -157,14 +157,7 @@ struct LocalitySensitiveHash {
         fs << "}";
     }
 
-    void unSerialize(const std::string &filename) {
-        cv::FileStorage fs(filename, cv::FileStorage::READ);
-        if (!fs.isOpened())
-        {
-            std::cerr << "Failed to open " << filename << std::endl;
-            throw std::runtime_error("failed to open file");
-        }
-        const cv::FileNode &fn = fs["hashTable"];
+    void unSerialize(const cv::FileNode  &fn) {
         
         const std::string description( (std::string)fn["description"]);
         int nBuckets_2 = (int)fn["numBuckets"];
