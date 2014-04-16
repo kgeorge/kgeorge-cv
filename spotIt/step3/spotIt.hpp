@@ -23,7 +23,7 @@
 
 #include "kgUtils.hpp"
 #include "kgLocalitySensitiveHash.hpp"
-#include "kgGeometricHashing.hpp"
+#include "kgGeometricHash.hpp"
 
 template<>
 struct KgCommon_Traits< cv::Point2f >{
@@ -73,14 +73,14 @@ struct KgCommon_Traits< cv::Point2f >{
 };
 
 
-struct HashEntry {
+struct LSHashEntryForGeometricHash {
     cv::Point2f l;
     cv::Point2f r;
     int count;
-    HashEntry(const cv::Point2f &l, const cv::Point2f &r):
+    LSHashEntryForGeometricHash(const cv::Point2f &l, const cv::Point2f &r):
     l(l), r(r), count(0){}
-    HashEntry():count(0){}
-    bool operator==(const HashEntry &h)const {
+    LSHashEntryForGeometricHash():count(0){}
+    bool operator==(const LSHashEntryForGeometricHash &h)const {
         return h.l == l && h.r == r;
     }
     void write(cv::FileStorage &fs) const {
@@ -103,11 +103,11 @@ struct HashEntry {
 };
 
 //These write and read functions must be defined for the serialization in FileStorage to work
-static void write(cv::FileStorage& fs, const std::string&, const HashEntry& x)
+static void write(cv::FileStorage& fs, const std::string&, const LSHashEntryForGeometricHash& x)
 {
     x.write(fs);
 }
-static void read(const cv::FileNode& node, HashEntry& x, const HashEntry& default_value = HashEntry()){
+static void read(const cv::FileNode& node, LSHashEntryForGeometricHash& x, const LSHashEntryForGeometricHash& default_value = LSHashEntryForGeometricHash()){
     if(node.empty())
         x = default_value;
     else
@@ -133,6 +133,13 @@ struct std::less<cv::Point2f> : std::binary_function< cv::Point2f, cv::Point2f, 
 
 struct ClusterItem;
 struct ContourRepresentativePoint;
+
+typedef LocalitySensitiveHash<
+    cv::Point2f,
+    LSHashEntryForGeometricHash,
+    3,
+    KgLocalitySensitiveHash_Traits< cv::Point2f >
+    > SpotItLocalitySensitiveHashBase;
 
 class SpotIt {
 public:
@@ -201,7 +208,7 @@ protected:
     std::vector< std::function<void(char)>> *pKeyboardCallbackRegistry;
     std::vector<std::function<void(int, int, int, int, void*)>> *pMouseCallbackRegistry;
     std::vector< std::vector<cv::Point2f> > approximatedContours;
-    Hash< cv::Point2f, HashEntry, 3, KgGeometricHash_Traits< cv::Point2f > > hash;
+    SpotItLocalitySensitiveHashBase lsHash;
     std::vector<std::vector<cv::Point2f>> pointClusters;
     std::vector<cv::Point2f> pointClusterCentroids;
     struct  ColorScheme {

@@ -7,8 +7,8 @@ using namespace cv;
 
 
 
-TEST( LSHHashing, PStable) {
-    Hash<Point2f, HashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f > > hashEngine(1.0f, -2, 2);
+TEST( LocalitySensitiveHashing, PStable) {
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f > > hashEngine(1.0f, -2, 2);
     int hashOutput1[3];
     
     std::mt19937 gen(42);
@@ -74,8 +74,8 @@ static void read(const FileNode& node, TestHashEntry& x, const TestHashEntry& de
         x.read(node);
 }
 
-TEST( LSHHashing, Serialization1) {
-    Hash<Point2f, TestHashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -2, 2);
+TEST( LocalitySensitiveHashing, Serialization1) {
+    LocalitySensitiveHash<Point2f, TestHashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -2, 2);
 
     Point2f pt1(0.5f, 0.5f), pt2(0.0f, -0.7f);
     TestHashEntry he1(67);
@@ -88,7 +88,7 @@ TEST( LSHHashing, Serialization1) {
     const std::string fname("testhash1.xml");
     hashEngine.serialize(fname);
     
-    Hash<Point2f, TestHashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
+    LocalitySensitiveHash<Point2f, TestHashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
     hashEngine2.unSerialize(fname);
     EXPECT_EQ(hashEngine.w, hashEngine2.w);
     EXPECT_EQ(hashEngine.oneByW, hashEngine2.oneByW);
@@ -101,12 +101,12 @@ TEST( LSHHashing, Serialization1) {
 
 
 
-TEST( LSHHashing, Serialization2) {
-    Hash<Point2f, HashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f > > hashEngine(1.0f, -2, 2);
+TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f > > hashEngine(1.0f, -2, 2);
     
     Point2f pt1(0.5f, 0.5f), pt2(0.0f, -0.7f);
-    HashEntry he1(Point2f(0,0), Point2f(0,1));
-    HashEntry he2(Point2f(1,0), Point2f(1,1));
+    LSHashEntryForGeometricHash he1(Point2f(0,0), Point2f(0,1));
+    LSHashEntryForGeometricHash he2(Point2f(1,0), Point2f(1,1));
     
     hashEngine.index(pt1, he1);
     hashEngine.index(pt1, he1);
@@ -115,7 +115,7 @@ TEST( LSHHashing, Serialization2) {
     const std::string fname("testhash2.xml");
     hashEngine.serialize(fname);
     
-    Hash<Point2f, HashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
     hashEngine2.unSerialize(fname);
     EXPECT_EQ(hashEngine.w, hashEngine2.w);
     EXPECT_EQ(hashEngine.oneByW, hashEngine2.oneByW);

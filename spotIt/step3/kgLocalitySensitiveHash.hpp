@@ -22,58 +22,22 @@
 #include "kgKernel.hpp"
 
 
-/*
-template< typename T >
-struct KgLocalitySensitiveHash_Traits {
-    typedef typename T::value_type I;
-    typedef typename AppropriateNonIntegralType<I>::value_type K;
-    static K distSqrd(const T &l, const T &r) {
-        throw std::runtime_error( "not implemented" );
-    }
-
-    static T orthogonal(const T &) {
-        throw std::runtime_error( "not implemented" );
-    }
-
-    static K dot(const T &l, const T &t) {
-        throw std::runtime_error( "not implemented" );
-    }
-    static T &negate(T) {
-        throw std::runtime_error( "not implemented" );
-    }
-
-    //returns  -1 for left, 0 for on , +1 for right
-    static int leftRightOrOn(const T &a, const T &b, const T &c) {
-        throw std::runtime_error( "not implemented" );
-    }
-
-    static T gen(std::normal_distribution<> &norm, std::mt19937 &gen) {
-        throw std::runtime_error( "not implemented" );
-    }
-
-    friend T & operator * ( T &l, K s) {
-        throw std::runtime_error( "not implemented" );
-    }
-};
-
-*/
-
-template< typename HashEntry>
+template< typename LSHashEntry>
 struct HashTableValue {
-    std::deque< HashEntry > data;
+    std::deque< LSHashEntry > data;
     void clear() {
         data.clear();
     }
 };
 
 
-template<typename T, typename HashEntry,  int numBuckets, typename TTraits = KgLocalitySensitiveHash_Traits< T >  >
-struct Hash {
+template<typename T, typename LSHashEntry,  int numBuckets, typename TTraits = KgLocalitySensitiveHash_Traits< T >  >
+struct LocalitySensitiveHash {
     typedef typename T::value_type I;
     typedef typename AppropriateNonIntegralType<I>::value_type K;
     static constexpr K zero = static_cast<K>(0);
     static constexpr K one = static_cast<K>(1);
-    Hash(K w, K minRange, K maxRange):
+    LocalitySensitiveHash(K w, K minRange, K maxRange):
         w(w),
         minRange(minRange),
         maxRange(maxRange),
@@ -82,7 +46,7 @@ struct Hash {
         ndist(std::normal_distribution<>(zero, one)) {
         resize(w, minRange, maxRange);
     }
-    Hash():
+    LocalitySensitiveHash():
         w(1),
         oneByW(one/w),
         gen(42),
@@ -99,7 +63,7 @@ struct Hash {
         return ret[2] * nSizePerBucket * nSizePerBucket + ret[1] * nSizePerBucket + ret[0];
     }
     
-    void index( const T &arg, const HashEntry & entry) {
+    void index( const T &arg, const LSHashEntry & entry) {
         K temp;
         K numSizeBy2 = nSizePerBucket/2;
         for(int i=0; i < numBuckets; ++i) {
@@ -111,7 +75,7 @@ struct Hash {
         }
         int hashTableIndex = findIndex(tempStorage);
         assert(hashTableIndex < hashTable.size());
-        HashTableValue<HashEntry> &hashTableVal = hashTable[hashTableIndex];
+        HashTableValue<LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
         auto hit = hashTableVal.data.begin();
         int numEntriesOfSameValue =0;
         bool found = false;
@@ -123,7 +87,7 @@ struct Hash {
             }
         }
         if(!found) {
-            HashEntry entry_2(entry);
+            LSHashEntry entry_2(entry);
             entry_2.count++;
             hashTableVal.data.push_back(entry_2);
 
@@ -175,13 +139,13 @@ struct Hash {
         fs << "numEntries" << numEntries;
         fs << "data" << "[";
         for(int i=0; i < hashTable.size(); ++i) {
-            const HashTableValue<HashEntry> &htValue = hashTable[i];
+            const HashTableValue<LSHashEntry> &htValue = hashTable[i];
             if (htValue.data.size() > 0) {
                 fs << "{";
                 fs << "index" << i;
                 fs << "tableEntries" << "[";
                 for(int j=0; j < htValue.data.size(); ++j) {
-                    const HashEntry &he = htValue.data[j];
+                    const LSHashEntry &he = htValue.data[j];
                     fs << he;
                 }
                 fs << "]";
@@ -233,7 +197,7 @@ struct Hash {
          
             
             for (; it_2 != it_2_end; ++it_2) {
-                HashEntry he;
+                LSHashEntry he;
                 (*it_2) >> he;
                 hashTable[index].data.push_back(he);
                 ++numEntries;
@@ -279,7 +243,7 @@ struct Hash {
     int tempStorage[numBuckets];
     int nSizePerBucket;
     int nSizeAllBuckets;
-    std::deque<HashTableValue< HashEntry > > hashTable;
+    std::deque<HashTableValue< LSHashEntry > > hashTable;
     int numEntries;
 };
 

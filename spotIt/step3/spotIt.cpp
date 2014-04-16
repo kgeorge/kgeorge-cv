@@ -20,7 +20,7 @@
 #include "spotIt.hpp"
 #include "kgUtils.hpp"
 #include "kMeansClustering.hpp"
-#include "kgGeometricHashing.hpp"
+#include "kgGeometricHash.hpp"
 
 using namespace std;
 using namespace cv;
@@ -56,7 +56,7 @@ statsMakerMaxX("maxX"),
 statsMakerMaxY("maxY"),
 statsMakerMinX("minX"),
 statsMakerMinY("minY"),
-hash(1.0, -80, 80),
+lsHash(1.0, -80, 80),
 pKeyboardCallbackRegistry(pKeyboardCallbackRegistry),
 pMouseCallbackRegistry(pMouseCallbackRegistry){
     //register keyboard function
@@ -286,10 +286,10 @@ bool SpotIt::processCircle(
 
 
 void SpotIt::geometricHashBuilding(vector<vector<Point2f> >::const_iterator b, vector<vector<Point2f> >::const_iterator e) {
-    hash.clear();
+    lsHash.clear();
     //KgGeometricHash<vector<Point2f>,  Quantizer<float>, KgGeometricHash_Traits< vector<Point2f> > > geomHash(contours.begin(), contours.end());
     KgGeometricHash<vector<Point2f>,  Quantizer<float> >  geomHash(b, e);
-    geomHash.processTemplateSet(1.0f, hash);
+    geomHash.processTemplateSet(1.0f, lsHash);
     statsMakerMaxX.addSample(geomHash.maxValX);
     statsMakerMaxY.addSample(geomHash.maxValY);
     statsMakerMinX.addSample(geomHash.minValX);
@@ -396,7 +396,7 @@ bool SpotIt::handleKey(char keyChar) {
         case 'c':
         case 'C':
             std::cout << "SpotIt::handling key char: " << keyChar <<  std::endl;
-            hash.serialize("geomHash.xml");
+            lsHash.serialize("geomHash.xml");
             //writePointClusters("pointCluster.xml", pointClusters);
             //write the pointCluster to a file
             //save the output image in current directory
