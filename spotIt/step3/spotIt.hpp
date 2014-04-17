@@ -76,24 +76,27 @@ struct KgCommon_Traits< cv::Point2f >{
 struct LSHashEntryForGeometricHash {
     cv::Point2f l;
     cv::Point2f r;
+    int templateId;
     int count;
     LSHashEntryForGeometricHash(const cv::Point2f &l, const cv::Point2f &r):
-    l(l), r(r), count(0){}
+    l(l), r(r), count(0),templateId(-1){}
     LSHashEntryForGeometricHash():count(0){}
     bool operator==(const LSHashEntryForGeometricHash &h)const {
-        return h.l == l && h.r == r;
+        return h.l == l && h.r == r && h.templateId == templateId;
     }
     void write(cv::FileStorage &fs) const {
         fs << "{";
         fs << "left" << l;
         fs << "right" << r;
         fs << "count" << count;
+        fs << "templateId" << templateId;
         fs << "}";
 
     }
     void read(const cv::FileNode &node) {
         node["left"] >> l;
         node["right"] >> r;
+        templateId = (int)node["templateId"];
         count = (int)node["count"];
     }
 };

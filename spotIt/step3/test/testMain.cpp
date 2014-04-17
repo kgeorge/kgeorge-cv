@@ -147,6 +147,28 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
 }
 
 
+TEST( LocalitySensitiveHashingFirGeometricHash, Serialization3) {
+
+
+    const std::string fname("testHash3.xml");
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
+
+    {
+        cv::FileStorage fs(fname, cv::FileStorage::READ);
+        cv::FileNode fn = fs["HashTable"];
+        hashEngine2.unSerialize(fn);
+        fs.release();
+    }
+    EXPECT_EQ(1.0, hashEngine2.w);
+    EXPECT_EQ(1.0, hashEngine2.oneByW);
+    EXPECT_EQ(-80, hashEngine2.minRange);
+    EXPECT_EQ(80, hashEngine2.maxRange);
+    EXPECT_EQ(160, hashEngine2.nSizePerBucket);
+    EXPECT_EQ(4096000, hashEngine2.nSizeAllBuckets);
+    //EXPECT_EQ(hashEngine.numEntries, hashEngine2.numEntries);
+}
+
+
 
 TEST( SpotIt, Write) {
     vector< vector< Point2f > > ptClusters(2);

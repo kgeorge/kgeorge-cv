@@ -433,7 +433,8 @@ bool SpotIt::handleMouse( int event, int x, int y, int flags, void * userdata) {
                 whichClusterIdx = i;
             }
         }
-        if(whichClusterIdx >= 0) {
+        if(whichClusterIdx >= 0 && minDistSq < 15000.0f) {
+            cout << "minDistSq: " << minDistSq << endl;
             geometricHashBuilding(whichClusterIdx);
         }
 

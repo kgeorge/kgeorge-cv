@@ -83,18 +83,32 @@ def makeTemplateMap( templateNames, templateMap):
     print "processed %d templates" % (len(templateNames))
 
 def processFile(fpath):
+    (head, tail) = os.path.split(fpath)
+    (tailName, ext) = os.path.splitext(tail)
+    templateId = gTemplateMap.get(tailName, None)
+    assert(templateId >= 0)
     tree = ET.parse(fpath)
     n = tree.find('SpotItHash/name')
+    n.text = tailName
+    data = tree.find("SpotItHash/hashTable/data")
     ntext = n.text if (n != None ) else ""
-    print "%s, %r" % (fpath, ntext)
-    #tree.write("foo.xml", encoding="utf-8", xml_declaration=True)
+    hentry = list(data._children)
+    for h in hentry:
+        tes = h.find('tableEntries')
+        te_list = list(tes._children)
+        for te in te_list:
+            tid = te.find('templateId')
+            tid.text = str(templateId)
+
+    print "%s, %r, %d" % (fpath, ntext, len(data._children))
+    tree.write("foo.xml", encoding="utf-8", xml_declaration=True)
 
     #raise "HiHI"
     pass
 
 def fun(argdir):
-    makeTemplateMap(templateNames, templateMap)
-    print "%r" % templateMap
+    makeTemplateMap(gTemplateNames, gTemplateMap)
+    print "%r" % gTemplateMap
     for root,dir,files in os.walk(argdir):
         for item in fnmatch.filter(files, "*.xml"):
             processFile(os.path.join(root,item))
