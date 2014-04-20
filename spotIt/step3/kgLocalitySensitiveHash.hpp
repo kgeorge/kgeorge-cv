@@ -62,8 +62,8 @@ struct LocalitySensitiveHash {
         //for nBuckets != 3
         return ret[2] * nSizePerBucket * nSizePerBucket + ret[1] * nSizePerBucket + ret[0];
     }
-    
-    void index( const T &arg, const LSHashEntry & entry) {
+
+    int computeHashTableIndexCore(const T &arg) {
         K temp;
         K numSizeBy2 = nSizePerBucket/2;
         for(int i=0; i < numBuckets; ++i) {
@@ -75,6 +75,11 @@ struct LocalitySensitiveHash {
         }
         int hashTableIndex = findIndex(tempStorage);
         assert(hashTableIndex < hashTable.size());
+        return hashTableIndex;
+    }
+    
+    int index( const T &arg, const LSHashEntry & entry) {
+        int hashTableIndex =  computeHashTableIndexCore(arg);
         HashTableValue<LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
         auto hit = hashTableVal.data.begin();
         int numEntriesOfSameValue =0;
@@ -92,11 +97,29 @@ struct LocalitySensitiveHash {
             hashTableVal.data.push_back(entry_2);
 
             ++numEntries;
+            assert(count() == numEntries);
             if(((numEntries % 100) == 0) && (numEntries >= 100)) {
                 //stats();
             }
         }
         assert( numEntriesOfSameValue <= 1);
+        return hashTableIndex ;
+    }
+
+    void query( const T &arg,  const LSHashEntry & entry, std::map<LSHashEntry, int> &templateMatch) {
+        int hashTableIndex =  computeHashTableIndexCore(arg);
+        HashTableValue<LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
+        auto hit = hashTableVal.data.begin();
+        for(hit = hashTableVal.data.begin(); hit != hashTableVal.data.end(); ++hit) {
+            assert(hit->templateId >=0);
+            auto tmatch = templateMatch.find(*hit);
+            if(tmatch == templateMatch.end()) {
+                templateMatch.insert(std::pair<LSHashEntry, int>(*hit, hit->count));
+            } else {
+                tmatch->second += hit->count;
+            }
+        }
+
     }
     
     
@@ -128,6 +151,16 @@ struct LocalitySensitiveHash {
         numEntries=0;
     }
 
+
+    int count() {
+        int nEntries = 0;
+        for(int i=0; i < hashTable.size(); ++i) {
+            const HashTableValue<LSHashEntry> &htValue = hashTable[i];
+            nEntries += htValue.data.size();
+        }
+        return nEntries;
+
+    }
     void serialize(cv::FileStorage &fs) const{
         assert(fs.isOpened());
         fs << "{";

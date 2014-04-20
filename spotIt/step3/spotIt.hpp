@@ -73,17 +73,36 @@ struct KgCommon_Traits< cv::Point2f >{
 };
 
 
+//order the element
+template<>
+struct std::less<cv::Point2f> : std::binary_function< cv::Point2f, cv::Point2f, bool> {
+    typedef cv::Point2f::value_type I;
+    EpsilonEq<I> epsilonEq;
+    bool operator()(const cv::Point2f &l, const cv::Point2f &r) {
+        bool b =
+        ( l.x != r.x )?
+        (l.x < r.x) :
+        ( l.y != r.y ) ?
+         (l.y < r.y):
+         false;
+        return b;
+    }
+};
+
+
+
 struct LSHashEntryForGeometricHash {
     cv::Point2f l;
     cv::Point2f r;
     int templateId;
     int count;
-    LSHashEntryForGeometricHash(const cv::Point2f &l, const cv::Point2f &r):
-    l(l), r(r), count(0),templateId(-1){}
+    LSHashEntryForGeometricHash(const cv::Point2f &l, const cv::Point2f &r, int templateId=-1):
+    l(l), r(r), count(0),templateId(templateId){}
     LSHashEntryForGeometricHash():count(0){}
     bool operator==(const LSHashEntryForGeometricHash &h)const {
         return h.l == l && h.r == r && h.templateId == templateId;
     }
+
     void write(cv::FileStorage &fs) const {
         fs << "{";
         fs << "left" << l;
@@ -101,6 +120,25 @@ struct LSHashEntryForGeometricHash {
     }
 };
 
+inline std::ostream & operator << ( std::ostream &o, const LSHashEntryForGeometricHash & rhs) {
+    o << rhs.templateId << ", (" << rhs.l.x << ", " << rhs.l.y << "), (" << rhs.r.x << ", " << rhs.r.y << ")";
+    return o;
+}
+//order the element
+template<>
+struct std::less<LSHashEntryForGeometricHash> : std::binary_function< LSHashEntryForGeometricHash, LSHashEntryForGeometricHash, bool> {
+    bool operator()(const LSHashEntryForGeometricHash &left, const LSHashEntryForGeometricHash &right) const {
+        std::less<cv::Point2f> lessPoint2f;
+        return (left.templateId != right.templateId) ? (left.templateId < right.templateId):
+            (left.l != right.l) ? lessPoint2f(left.l, right.l) :
+             (left.r != right.r) ? lessPoint2f(left.r, right.r): false;
+    }
+};
+
+
+
+
+
 //These write and read functions must be defined for the serialization in FileStorage to work
 static void write(cv::FileStorage& fs, const std::string&, const LSHashEntryForGeometricHash& x)
 {
@@ -112,7 +150,7 @@ static void read(const cv::FileNode& node, LSHashEntryForGeometricHash& x, const
     else
         x.read(node);
 }
-
+/*
 //order the element
 template<>
 struct std::less<cv::Point2f> : std::binary_function< cv::Point2f, cv::Point2f, bool> {
@@ -128,7 +166,7 @@ struct std::less<cv::Point2f> : std::binary_function< cv::Point2f, cv::Point2f, 
         return b;
     }
 };
-
+*/
 
 struct ClusterItem;
 struct ContourRepresentativePoint;
@@ -180,7 +218,7 @@ struct SpotItLocalitySensitiveHash : public SpotItLocalitySensitiveHashBase {
         cv::FileNode fn = fs["SpotItHash"];
         cv::FileNode score = fn["score"];
         std::string name = (std::string)fn["name"];
-        cv::FileNode fn_hashtable = fn["HashTable"];
+        cv::FileNode fn_hashtable = fn["hashTable"];
         SpotItLocalitySensitiveHashBase::unSerialize(fn_hashtable);
         fs.release();
     }
@@ -188,6 +226,8 @@ struct SpotItLocalitySensitiveHash : public SpotItLocalitySensitiveHashBase {
 };
 
 class SpotIt {
+public:
+typedef enum { eCollect=0, eQuery} EMode;
 public:
     SpotIt( std::vector< std::function<void(char)>> *pKeyboardCallbackRegistry,
            std::vector<std::function<void(int, int, int, int, void*)>> *pMouseCallbackRegistry);
@@ -200,8 +240,12 @@ public:
                        cv::Mat &inputImage,
                        cv::Mat &roiOutputImageCopy);
     
-    void readPointClusters(const std::string &filename, std::vector< std::vector< cv::Point2f > > &ptClusters);
-    void writePointClusters(const std::string &filename, const std::vector< std::vector< cv::Point2f > > &ptClusters);
+    static void readPointClusters(const std::string &filename,  std::string &name, std::vector< cv::Point2f >  &ptCluster);
+    static void writePointClusters(
+        const std::string &filename,
+        const  std::string &name,
+        const std::vector< cv::Point2f >  &ptCluster,
+        const cv::Point2f &clusterCentroid);
     
 protected:
     
@@ -240,7 +284,8 @@ protected:
                            const std::vector<std::vector<cv::Point> > & inContours,
                            const std::vector<bool> &shouldProcessContour,
                            std::vector<std::vector<cv::Point2f> > & outContours ) ;
-    
+
+    void geometricHashQuerying( int pointClusterIndex);
     void geometricHashBuilding( int pointClusterIndex);
     void geometricHashBuilding(std::vector<std::vector<cv::Point2f> >::const_iterator b, std::vector<std::vector<cv::Point2f> >::const_iterator e);
     
@@ -267,6 +312,11 @@ protected:
     std::vector<ColorScheme> colorSchemesForDrawing;
     friend void keyboardCallback(SpotIt *p, char keyChar);
     friend void mouseCallback(SpotIt *p, int event, int x, int y, int flags, void * userdata);
+    void initTemplateNameLookup();
+    std::map<std::string, int> templateNameLookup;
+    std::map<std::string, std::vector<cv::Point2f> > pointClusterMap;
+    EMode mode;
+    int lastSelectedClusterIdx;
 };
 
 

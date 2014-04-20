@@ -39,7 +39,7 @@ void key_callback(char keyChar, const Mat& roiOutputImage, bool &processNextFram
         case 's':
         case 'S':
             //save the output image in current directory
-            imwrite("roiOutputImageLast.jpg", roiOutputImage );
+            imwrite("data/roiOutputImageLast.jpg", roiOutputImage );
             break;
         case 'n':
         case 'N':

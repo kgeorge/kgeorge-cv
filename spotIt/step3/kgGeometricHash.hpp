@@ -114,7 +114,12 @@ public:
     
     template<typename LSHashEntry, typename LSHashTraits>
     void processTemplateSet(K w, LocalitySensitiveHash<T, LSHashEntry, 3, LSHashTraits> &lsHash);
-    
+
+    template<typename LSHashEntry, typename LSHashTraits>
+    void queryTemplateSet(
+        LocalitySensitiveHash<T, LSHashEntry, 3, LSHashTraits> &lsHash,
+        std::vector<std::map<int,int>> &templateMatches);
+
     K maxValX;
     K minValX;
     
@@ -185,7 +190,7 @@ void KgGeometricHash<TTemplate, Q >::processTemplateSet(K w, LocalitySensitiveHa
                         maxValY = (quantizer(projection.y) > maxValY) ? quantizer(projection.y) : maxValY;
                         minValX = (quantizer(projection.x) < minValX) ? quantizer(projection.x) : minValX;
                         minValY = (quantizer(projection.y) < minValY) ? quantizer(projection.y) : minValY;
-                        LSHashEntry he(*pointIt, *nextPointIt);
+                        LSHashEntry he(l, r);
                         lsHash.index(projection, he);
                     }
                 }
@@ -196,6 +201,91 @@ void KgGeometricHash<TTemplate, Q >::processTemplateSet(K w, LocalitySensitiveHa
     //std::cout << "///////////////////////////////////////////////////" << std::endl;
     //std::cout << "maximum:  x: " << maxValX <<  ", " << maxValY << ", minimum: " << minValX <<   ",  " << minValY << std::endl;
     
+}
+
+
+
+template< typename TTemplate, typename Q>
+template<typename LSHashEntry, typename LSHashTraits>
+void KgGeometricHash<TTemplate, Q >::queryTemplateSet(
+    LocalitySensitiveHash<T, LSHashEntry, 3, LSHashTraits> &lsHash,
+    std::vector<std::map<int,int>> &templateMatches) {
+    std::cout << "querying " << std::endl;
+    templateMatches.resize(queue_.size());
+    int queueIdx =0;
+    for(auto qit= queue_.begin(); qit != queue_.end(); ++qit, ++queueIdx) {
+        const TTemplate *t = *qit;
+        TemplateExtra_<TTemplate, TTraits> extra;
+        extra.compute(t->begin(), t->end());
+        std::less< T > lessT;
+        Q quantizer;
+        K limitDistanceBetweenPoints =  4;
+        T templateCentroid;
+        if(t->begin() != t->end()) {
+            int numPoints = t->end() - t->begin();
+            K reciprocal = static_cast<K> (1.0)/numPoints;
+            for(auto pointIt =  t->begin(); pointIt != t->end(); ++pointIt ) {
+                templateCentroid = templateCentroid +  *pointIt;
+            }
+            templateCentroid = templateCentroid  * reciprocal;
+        }
+
+        for(auto pointIt =  t->begin(); pointIt != t->end(); ++pointIt ) {
+            auto nextPointIt = pointIt + 1;
+            for( ; nextPointIt != t->end(); ++nextPointIt) {
+                if( TTraits::distSqrd(*pointIt, *nextPointIt) >= limitDistanceBetweenPoints ) {
+                    T l(*pointIt), r(*nextPointIt);
+                    int isLeftRightOrOn = TTraits::leftRightOrOn(l, r, templateCentroid);
+                    if( isLeftRightOrOn == 0) {
+                        continue;
+                    } else if( isLeftRightOrOn > 1) {
+                        std::swap(l, r);
+                    }
+                    T diff = r-l;
+                    T centroidOfBase = (r + l) * static_cast<K>(0.5);
+                    K d = TTraits::distSqrd(r, l);
+                    assert(d > EpsilonEq<K>::epsilon_);
+                    K oneByLngth = 1.0/sqrt(d);
+                    T xAxis  =  diff * oneByLngth;
+                    T yAxis = TTraits::orthogonal(diff) * oneByLngth;
+                    T xAxisNeg(xAxis);
+                    T yAxisNeg(yAxis);
+
+                    TTraits::negate(xAxisNeg);
+                    TTraits::negate(yAxisNeg);
+
+                    auto allPointsIt = t->begin();
+                    std::less<LSHashEntry> le;
+                    std::map<LSHashEntry, int, std::less<LSHashEntry> > templateMatch(le);
+                    for( allPointsIt = t->begin(); allPointsIt != t->end(); ++allPointsIt ) {
+                        const T &currentPoint = *allPointsIt;
+                        T currentDiff = currentPoint - centroidOfBase;
+                        T projection(TTraits::dot(currentDiff, xAxis) * oneByLngth, TTraits::dot(currentDiff, yAxis) * oneByLngth);
+                        maxValX = (quantizer(projection.x) > maxValX) ? quantizer(projection.x) : maxValX;
+                        maxValY = (quantizer(projection.y) > maxValY) ? quantizer(projection.y) : maxValY;
+                        minValX = (quantizer(projection.x) < minValX) ? quantizer(projection.x) : minValX;
+                        minValY = (quantizer(projection.y) < minValY) ? quantizer(projection.y) : minValY;
+                        LSHashEntry he(l, r);
+                        lsHash.query(projection, he, templateMatch);
+                    }
+                    int maxCount =0;
+                    auto titWithMaxCount = templateMatch.begin();
+                    for(auto tit = templateMatch.begin(); tit != templateMatch.end(); ++tit) {
+                        if( maxCount < tit->second ) {
+                            maxCount = Kg::max<int>(tit->second, maxCount);
+                            titWithMaxCount = tit;
+                        }
+                    }
+
+                    std::cout << titWithMaxCount->first << ", " << titWithMaxCount->second << std::endl;
+                }
+
+            }
+        }
+    }
+    //std::cout << "///////////////////////////////////////////////////" << std::endl;
+    //std::cout << "maximum:  x: " << maxValX <<  ", " << maxValY << ", minimum: " << minValX <<   ",  " << minValY << std::endl;
+
 }
 
 #endif //KG_GEOMETRIC_HASH_H_

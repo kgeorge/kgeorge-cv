@@ -27,7 +27,69 @@ using namespace cv;
 using namespace std::placeholders;
 
 
-//wrapper for OGLAugmentedScene::_handleKey
+const char *gTemplateNames[] = {
+    "scissors",
+    "simpleDaisy",
+    "eye",
+    "ok",
+    "candle",
+    "bomb",
+    "lightning",
+    "cheese",
+    "fire",
+    "cactus",
+    "tree",
+    "sunSpark",
+    "bulb",
+    "seahorseDragon",
+    "anchor",
+    "loveHeart",
+    "balloon",
+    "paddleLock",
+    "ladyBug",
+    "questionMark",
+    "snowFlake",
+    "dolphin",
+    "toyMan",
+    "pencil",
+    "stop",
+    "musicalScore",
+    "spider",
+    "squareCat",
+    "ghostFace",
+    "key",
+    "icePuddle",
+    "carrot",
+    "puddle",
+    "exclamationMark",
+    "jokerFace",
+    "trex",
+    "art",
+    "apple",
+    "crescentMoon",
+    "palm",
+    "chessKnight",
+    "clock",
+    "car",
+    "snowMan",
+    "waterDrop",
+    "shamrock",
+    "target",
+    "maple",
+    "lips",
+    "igloo",
+    "yinYang",
+    "milkBottle",
+    "spiderWeb",
+    "toyZebra",
+    "sunglass",
+    "skullNBones",
+    "puppy",
+    "testhash4",
+    "testhash5"
+};
+
+//wrapper for handling key events
 void keyboardCallback(SpotIt *p, char keyChar) {
     bool bVal = p->handleKey(keyChar);
     if(bVal) {
@@ -38,6 +100,7 @@ void keyboardCallback(SpotIt *p, char keyChar) {
 
 
 
+//wrapper for handling mouse events
 void mouseCallback(SpotIt *p, int event, int x, int y, int flags, void * userdata) {
     p->handleMouse( event, x, y, flags, userdata);
 }
@@ -58,7 +121,9 @@ statsMakerMinX("minX"),
 statsMakerMinY("minY"),
 lsHash(1.0, -80, 80),
 pKeyboardCallbackRegistry(pKeyboardCallbackRegistry),
-pMouseCallbackRegistry(pMouseCallbackRegistry){
+pMouseCallbackRegistry(pMouseCallbackRegistry),
+mode(eCollect),
+lastSelectedClusterIdx(-1){
     //register keyboard function
     if( pKeyboardCallbackRegistry ) {
         std::function<void(char)> boundKeyboardFunBody = std::bind(keyboardCallback, this, _1 );
@@ -84,8 +149,18 @@ pMouseCallbackRegistry(pMouseCallbackRegistry){
     colorSchemesForDrawing.push_back( ColorScheme("skyblue", Scalar(235, 206, 135)) );
     colorSchemesForDrawing.push_back( ColorScheme("orange",  Scalar(0, 165, 255)) );
     colorSchemesForDrawing.push_back( ColorScheme("limegreen", Scalar(47, 255, 173)) );
+    initTemplateNameLookup();
 }
 
+
+
+void SpotIt::initTemplateNameLookup() {
+int numTemplatesRegistered = sizeof(gTemplateNames)/sizeof(const char*);
+for(int i=0; i < numTemplatesRegistered; ++i) {
+    templateNameLookup.insert(std::pair<std::string, int>(std::string(gTemplateNames[i]), i));
+}
+
+}
 
 SpotIt::~SpotIt( ) {
     if(  pKeyboardCallbackRegistry ) {
@@ -290,6 +365,21 @@ void SpotIt::geometricHashBuilding( int pointClusterIndex) {
     lsHash.colorName = colorSchemesForDrawing[pointClusterIndex].name;
 }
 
+
+void SpotIt::geometricHashQuerying( int pointClusterIndex) {
+    auto whichClusterIter =  pointClusters.begin() + pointClusterIndex;
+    KgGeometricHash<vector<Point2f>,  Quantizer<float> >  geomHash(whichClusterIter, whichClusterIter+1);
+    vector<map<int, int> > templateMatches;
+    geomHash.queryTemplateSet(lsHash, templateMatches);
+    for(int i=0; i < templateMatches.size(); ++i) {
+        map<int, int> &templateMatch = templateMatches[i];
+        std::cout << "template match :" << i << endl;
+        for(auto tm = templateMatch.begin(); tm != templateMatch.end(); ++tm) {
+            std::cout << tm->first << ": " << gTemplateNames[tm->first] << ": " << tm->second << std::endl;
+        }
+    }
+}
+
 void SpotIt::geometricHashBuilding(vector<vector<Point2f> >::const_iterator b, vector<vector<Point2f> >::const_iterator e) {
     lsHash.clear();
     //KgGeometricHash<vector<Point2f>,  Quantizer<float>, KgGeometricHash_Traits< vector<Point2f> > > geomHash(contours.begin(), contours.end());
@@ -317,82 +407,55 @@ void SpotIt::extractFeaturesFromRoiOutput (Mat &roiImage, vector<KeyPoint> &keyp
 }
 
 
-void SpotIt::writePointClusters(const std::string &filename, const std::vector< std::vector< cv::Point2f > > &ptClusters) {
+void SpotIt::writePointClusters(const std::string &filename, const std::string& name, const  std::vector< cv::Point2f >  &ptCluster, const cv::Point2f &clusterCentroid) {
     FileStorage fs(filename, FileStorage::WRITE);
-    fs << "clusters";
-    fs << "[";
-    for(int i=0; i < ptClusters.size(); ++i) {
-        const vector<Point2f> &ptCluster = ptClusters[i];
+    fs << "cluster";
         fs << "{";
-        fs << "id" << i;
-        fs << "comment" << "no comments";
         fs << "score" << "{";
         fs << "outlineOnly" << 80;
         fs << "noNoise" << 100;
         fs << "bigSize" << 50;
-        fs << "color" << colorSchemesForDrawing[i].name;
+        fs << "color" << name;
         fs << "connectedness" << 100;
         fs << "}";
-        fs << "name" << colorSchemesForDrawing[i].name;
-        fs <<"cluster";
+        fs << "name" << name;
+        fs <<"clusterData";
         fs << "[";
         for (int j=0; j < ptCluster.size(); ++j) {
-            fs << ptCluster[j];
+            Point2f clusterData = ptCluster[j] - clusterCentroid;
+            fs << clusterData;
         }
         fs << "]";
         fs << "}";
-    }
-    fs << "]";
+        fs.release();
 }
 
 
-void SpotIt::readPointClusters(const std::string &filename, std::vector< std::vector< cv::Point2f > > &ptClusters) {
+void SpotIt::readPointClusters(const std::string &filename, std::string &name,  std::vector< cv::Point2f >  &ptCluster) {
     FileStorage fs(filename, FileStorage::READ);
     if (!fs.isOpened())
     {
         cerr << "Failed to open " << filename << endl;
         throw runtime_error("failed to open file");
     }
-    FileNode n = fs["clusters"];                         // Read string sequence - Get node
-    if (n.type() != FileNode::SEQ)
+    FileNode fn = fs["cluster"];
+    FileNode fn_score = fn["score"];
+    FileNode fn_name = fn["name"];
+    FileNode fn_data = fn["clusterData"];
+    if (fn_data.type() != FileNode::SEQ)
     {
-        cerr << "clusters is not a sequence! FAIL" << endl;
-        throw runtime_error("clusters is not a sequence! FAIL");
+        cerr << "clusterData is not a sequence! FAIL" << endl;
+        throw runtime_error("clusterData is not a sequence! FAIL");
     }
-    
-    FileNodeIterator it = n.begin(), it_end = n.end(); // Go through the node
+
+    FileNodeIterator it = fn_data.begin(), it_end = fn_data.end(); // Go through the node
     for (; it != it_end; ++it) {
-        int id = (*it)["id"];
-        string name = (*it)["name"];
-        FileNode ncl = (*it)["cluster"];
-        string comment = (*it)["comment"];
-        FileNode sc = (*it) ["score"];
-        int outlineOnly =0;
-        outlineOnly << (int)sc["outlineOnly"];
-        int noise =0;
-        noise << (int)sc["noNoise"];
-        int connectedness =0;
-        connectedness << (int)sc["connectedness"];
-        int bigSize =0;
-        bigSize << (int)sc["bigSize"];
-        string color;
-        color  = (string)sc["color"];
-        if (ncl.type() != FileNode::SEQ)
-        {
-            cerr << "strings is not a sequence! FAIL" << endl;
-            throw runtime_error("strings is not a sequence! FAIL");
-        }
-        FileNodeIterator it2 = ncl.begin(), it2_end = ncl.end(); // Go through the node
-        vector<Point2f> ptCluster;
-        for (; it2 != it2_end; ++it2) {
             Point2f pt;
-            *it2 >> pt;
+            *it >> pt;
             ptCluster.push_back(pt);
-            //Point2f pt (*it2);
-        }
-        ptClusters.push_back(ptCluster);
     }
-}
+    fs.release();
+ }
 
 
 bool SpotIt::handleKey(char keyChar) {
@@ -400,12 +463,52 @@ bool SpotIt::handleKey(char keyChar) {
     switch( keyChar ) {
         case 'c':
         case 'C':
-            std::cout << "SpotIt::handling key char: " << keyChar <<  std::endl;
-            lsHash.serialize("geomHash.xml" );
-            //writePointClusters("pointCluster.xml", pointClusters);
+            if(mode == eCollect) {
+                std::cout << "SpotIt::handling key char: " << keyChar <<  std::endl;
+                lsHash.serialize("data/geomHash.xml" );
+                if(lastSelectedClusterIdx >= 0) {
+                    vector<Point2f> &pointCluster = pointClusters[lastSelectedClusterIdx];
+                    writePointClusters(
+                        "data/cluster/pointCluster.xml",
+                        colorSchemesForDrawing[lastSelectedClusterIdx].name,
+                        pointCluster,
+                        pointClusterCentroids[lastSelectedClusterIdx]
+                        );
+                }
+            } else {
+
+            }
             //write the pointCluster to a file
             //save the output image in current directory
             retVal = true;
+            break;
+        case 'q':
+        case 'Q':
+            if(mode == eCollect) {
+                std::cout << "query mode: reading data/merged.xml";
+                lsHash.clear();
+                lsHash.unSerialize("data/merged.xml");
+                int numTemplates = sizeof(gTemplateNames)/sizeof(const char*);
+                for(int i=0; i < numTemplates; ++i) {
+                    string possibleFilePath = string("data/cluster/") +   string(gTemplateNames[i]) + string("_c.xml");
+                    FileStorage fs(possibleFilePath, FileStorage::READ);
+                    if(!fs.isOpened()) {
+                        continue;
+                    }
+                    cout << "reading file: " << possibleFilePath << endl;
+                    fs.release();
+                    vector<Point2f> &pointCluster = pointClusterMap[gTemplateNames[i]];
+                    std::string name;
+                    readPointClusters(possibleFilePath, name,  pointCluster);
+                    assert(readName == string(gTemplateName[i]));
+                }
+
+                std::cout << "query mode: read numEntries: " << lsHash.numEntries << std::endl;
+                mode = eQuery;
+            } else {
+                mode = eCollect;
+                std::cout << "switchig to collect mode" << std::endl;
+            }
             break;
         default:
             break;
@@ -435,7 +538,12 @@ bool SpotIt::handleMouse( int event, int x, int y, int flags, void * userdata) {
         }
         if(whichClusterIdx >= 0 && minDistSq < 15000.0f) {
             cout << "minDistSq: " << minDistSq << endl;
-            geometricHashBuilding(whichClusterIdx);
+            if(mode == eCollect) {
+                geometricHashBuilding(whichClusterIdx);
+            } else {
+                geometricHashQuerying(whichClusterIdx);
+            }
+            lastSelectedClusterIdx = whichClusterIdx;
         }
 
     }

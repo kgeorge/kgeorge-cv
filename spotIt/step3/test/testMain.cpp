@@ -62,6 +62,12 @@ struct TestHashEntry {
     }
 };
 
+
+std::ostream & operator << ( std::ostream &o, const TestHashEntry & rhs) {
+    o << rhs.i ;
+    return o;
+}
+
 static void write(FileStorage& fs, const std::string&, const TestHashEntry& x)
 {
     x.write(fs);
@@ -85,7 +91,7 @@ TEST( LocalitySensitiveHashing, Serialization1) {
     hashEngine.index(pt1, he1);
     hashEngine.index(pt2, he2);
 
-    const std::string fname("testhash1.xml");
+    const std::string fname("data/testhash1.xml");
     {
         cv::FileStorage fs(fname, cv::FileStorage::WRITE);
         fs << "HashTable";
@@ -122,7 +128,7 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
     hashEngine.index(pt2, he2);
 
 
-    const std::string fname("testhash2.xml");
+    const std::string fname("data/testhash2.xml");
     {
         cv::FileStorage fs(fname, cv::FileStorage::WRITE);
         fs << "HashTable";
@@ -147,16 +153,17 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
 }
 
 
-TEST( LocalitySensitiveHashingFirGeometricHash, Serialization3) {
 
 
-    const std::string fname("testHash3.xml");
+TEST( LocalitySensitiveHashingForGeometricHash, Serialization3) {
+    const std::string fname("data/merged.xml");
     LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
 
     {
         cv::FileStorage fs(fname, cv::FileStorage::READ);
-        cv::FileNode fn = fs["HashTable"];
-        hashEngine2.unSerialize(fn);
+        cv::FileNode fn = fs["SpotItHash"];
+        cv::FileNode fn2 = fn["hashTable"];
+        hashEngine2.unSerialize(fn2);
         fs.release();
     }
     EXPECT_EQ(1.0, hashEngine2.w);
@@ -170,6 +177,44 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization3) {
 
 
 
+TEST( LocalitySensitiveHashingForGeometricHash, ConstancyOfHash) {
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
+
+    Point2f pt1(0.5f, 0.5f), pt2(-1.0f, 0.0f), pt3(1.0f, 0.0f);
+    LSHashEntryForGeometricHash he1(pt1, pt2);
+    LSHashEntryForGeometricHash he2(pt2, pt3);
+    LSHashEntryForGeometricHash he3(pt3, pt1);
+
+    int index = hashEngine.index(pt3, he1);
+    for(int i=0; i < 5; ++i) {
+        int index2 =  hashEngine.index(pt3, he1);
+        EXPECT_EQ(index, index2);
+    }
+
+    for(int i=0; i < 5; ++i) {
+        int index2 =  hashEngine.index(pt3, he2);
+        EXPECT_EQ(index, index2);
+    }
+}
+
+
+TEST( LocalitySensitiveHashingForGeometricHash, LSHashEntryForGeometricHashOrder) {
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
+
+    Point2f pt1(0.5f, 0.5f), pt2(-1.0f, 0.0f), pt3(1.0f, 0.0f);
+    LSHashEntryForGeometricHash he1(pt1, pt2, 1);
+    LSHashEntryForGeometricHash he2(pt2, pt3, 1);
+
+    LSHashEntryForGeometricHash he3(pt3, pt1, 2);
+    LSHashEntryForGeometricHash he4(pt3, pt1, 2);
+
+    less<LSHashEntryForGeometricHash> lessHE;
+    EXPECT_EQ(lessHE(he1, he2), false);
+    EXPECT_EQ(lessHE(he1, he3), true);
+    EXPECT_EQ(he3 , he4);
+}
+
+
 TEST( SpotIt, Write) {
     vector< vector< Point2f > > ptClusters(2);
     ptClusters[0].reserve(2);
@@ -180,14 +225,14 @@ TEST( SpotIt, Write) {
     ptClusters[1].reserve(1);
     ptClusters[1].push_back(Point2f(100, 100));
     SpotIt sp(NULL, NULL);
-    sp.writePointClusters("foo.xml", ptClusters);
+
+    sp.writePointClusters("foo.xml", "blue", ptClusters[0], Point2f());
     
     vector< vector< Point2f > > ptClusters2;
-    sp.readPointClusters("foo.xml", ptClusters2);
-    
-    
-    
-    EXPECT_EQ(2, ptClusters2.size());
+    ptClusters2.resize(2);
+    std::string readName;
+    sp.readPointClusters("foo.xml", readName, ptClusters2[0]);
+
     EXPECT_EQ(ptClusters[0][0], ptClusters2[0][0]);
     
 }
