@@ -29,6 +29,10 @@ template<>
 struct KgCommon_Traits< cv::Point2f >{
     typedef cv::Point2f T;
     typedef AppropriateNonIntegralType<T::value_type>::value_type K;
+
+    static const int numElementsInT = 2;
+    static constexpr int numElementsInTPlus1 = 3;
+    typedef Eigen::Matrix<K, Eigen::Dynamic,  numElementsInTPlus1> TMatrix;
     
     static K distSqrd(const T &l, const T &r) {
         T diff = r - l;
@@ -63,13 +67,58 @@ struct KgCommon_Traits< cv::Point2f >{
         EpsilonEq<K> eps;
         return (eps(determinant, zero)) ?  0 : (( determinant < zero) ? -1 : 1 );
     }
-    
-    
+
+
+    static void fill( const T &arg, int idx,  TMatrix  &target) {
+        target(idx, 0)  = arg.x;
+        target(idx, 1)  = arg.y;
+        target(idx, 2)  = 1.0f;
+    }
+
     friend T & operator * ( T &l, K s) {
         l *= s;
         return l;
     }
     
+};
+
+template<>
+struct KgGeometricHash_Traits<cv::Point2f> : public KgCommon_Traits<cv::Point2f>{
+
+
+    template< typename LSHEntry>
+    static void foo( const LSHEntry &a) {
+        std::cout << "KgGeometricHash_Traits::foo" << std::endl;
+    }
+
+    template<typename LSHEntry>
+    static const T &left( const LSHEntry &entry) {
+        //throw std::runtime_error( "not implemented" );
+        return entry.l;
+    }
+
+
+    template<typename LSHEntry>
+    static const T &right( const LSHEntry &entry) {
+        //throw std::runtime_error( "not implemented" );
+        return entry.r;
+    }
+
+
+    template<typename LSHEntry>
+    static T &left( LSHEntry &entry) {
+        //throw std::runtime_error( "not implemented" );
+        return entry.l;
+    }
+
+
+    template<typename LSHEntry>
+    static T &right( LSHEntry &entry) {
+        //throw std::runtime_error( "not implemented" );
+        return entry.r;
+    }
+
+
 };
 
 
@@ -135,6 +184,17 @@ struct std::less<LSHashEntryForGeometricHash> : std::binary_function< LSHashEntr
     }
 };
 
+
+//order the element
+template<>
+struct std::less<LSHashEntryForGeometricHash*> : std::binary_function< LSHashEntryForGeometricHash*, LSHashEntryForGeometricHash*, bool> {
+    bool operator()(const LSHashEntryForGeometricHash *left, const LSHashEntryForGeometricHash *right) const {
+        std::less<cv::Point2f> lessPoint2f;
+        return (left->templateId != right->templateId) ? (left->templateId < right->templateId):
+            (left->l != right->l) ? lessPoint2f(left->l, right->l) :
+             (left->r != right->r) ? lessPoint2f(left->r, right->r): false;
+    }
+};
 
 
 
@@ -314,7 +374,7 @@ protected:
     friend void mouseCallback(SpotIt *p, int event, int x, int y, int flags, void * userdata);
     void initTemplateNameLookup();
     std::map<std::string, int> templateNameLookup;
-    std::map<std::string, std::vector<cv::Point2f> > pointClusterMap;
+    std::map<int, std::vector<cv::Point2f> > pointClusterMap;
     EMode mode;
     int lastSelectedClusterIdx;
 };

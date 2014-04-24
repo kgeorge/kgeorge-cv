@@ -37,6 +37,7 @@ struct LocalitySensitiveHash {
     typedef typename AppropriateNonIntegralType<I>::value_type K;
     static constexpr K zero = static_cast<K>(0);
     static constexpr K one = static_cast<K>(1);
+    static constexpr int numQueryIndices = Kg::Pow<3, numBuckets>::value;
     LocalitySensitiveHash(K w, K minRange, K maxRange):
         w(w),
         minRange(minRange),
@@ -63,7 +64,7 @@ struct LocalitySensitiveHash {
         return ret[2] * nSizePerBucket * nSizePerBucket + ret[1] * nSizePerBucket + ret[0];
     }
 
-    int computeHashTableIndexCore(const T &arg) {
+    int computeHashTableIndexCore(const T &arg ) {
         K temp;
         K numSizeBy2 = nSizePerBucket/2;
         for(int i=0; i < numBuckets; ++i) {
@@ -77,7 +78,47 @@ struct LocalitySensitiveHash {
         assert(hashTableIndex < hashTable.size());
         return hashTableIndex;
     }
-    
+
+    void advanceDiffIndex( int diffIndex[numBuckets]) {
+
+    for(int i=0; i < numBuckets; ++i) {
+        if(diffIndex[i] < 1) {
+            diffIndex[i] += 1;
+            return;
+        } else {
+            diffIndex[i] = -1;
+        }
+     }
+    }
+
+
+    void computeHashTableIndexCoreQ(const T &arg, int retVal [numQueryIndices] ) {
+        K temp;
+       int tempStorage2[numBuckets];
+        K numSizeBy2 = nSizePerBucket/2;
+        for(int i=0; i < numBuckets; ++i) {
+            temp = TTraits::dot(a[i], arg) + b[i];
+            tempStorage[i] = floor(temp * oneByW);
+            assert(tempStorage[i] >= -numSizeBy2 && tempStorage[i] <= numSizeBy2);
+            tempStorage[i] += numSizeBy2;
+            assert(tempStorage[i] > 0);
+        }
+        int diffIndex [numBuckets];
+        for(int i=0; i < numBuckets; ++i) {
+            diffIndex[i] = -1;
+        }
+        for(int j=0; j < numQueryIndices; ++j) {
+            for(int i=0; i < numBuckets; ++i ) {
+                tempStorage2[i] = tempStorage[i] + diffIndex[i];
+            }
+            int hashTableIndex = findIndex(tempStorage2);
+            assert(hashTableIndex < hashTable.size());
+            retVal[j] = hashTableIndex;
+            advanceDiffIndex( diffIndex);
+        }
+    }
+
+
     int index( const T &arg, const LSHashEntry & entry) {
         int hashTableIndex =  computeHashTableIndexCore(arg);
         HashTableValue<LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
@@ -105,21 +146,26 @@ struct LocalitySensitiveHash {
         assert( numEntriesOfSameValue <= 1);
         return hashTableIndex ;
     }
-
-    void query( const T &arg,  const LSHashEntry & entry, std::map<LSHashEntry, int> &templateMatch) {
-        int hashTableIndex =  computeHashTableIndexCore(arg);
-        HashTableValue<LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
-        auto hit = hashTableVal.data.begin();
-        for(hit = hashTableVal.data.begin(); hit != hashTableVal.data.end(); ++hit) {
-            assert(hit->templateId >=0);
-            auto tmatch = templateMatch.find(*hit);
-            if(tmatch == templateMatch.end()) {
-                templateMatch.insert(std::pair<LSHashEntry, int>(*hit, hit->count));
-            } else {
-                tmatch->second += hit->count;
+    //std::map<const LSHashEntry *, int, std::less<LSHashEntry*> >
+    //void query( const T &arg,  const LSHashEntry & entry, std::map<const LSHashEntry*, int> &templateMatch) {
+    void query( const T &arg,  const LSHashEntry & entry, std::map<const LSHashEntry *, int, std::less<LSHashEntry*> > &templateMatch) {
+        int neighboringIndices[numQueryIndices];
+        computeHashTableIndexCoreQ(arg, neighboringIndices);
+        //int hashTableIndex =  computeHashTableIndexCore(arg);
+        for(int i=0; i < numQueryIndices; ++i) {
+            int hashTableIndex = neighboringIndices[i];
+            HashTableValue<LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
+            auto hit = hashTableVal.data.begin();
+            for(hit = hashTableVal.data.begin(); hit != hashTableVal.data.end(); ++hit) {
+                assert(hit->templateId >=0);
+                auto tmatch = templateMatch.find(&(*hit));
+                if(tmatch == templateMatch.end()) {
+                    templateMatch.insert(std::pair<const LSHashEntry*, int>(&(*hit), hit->count));
+                } else {
+                    tmatch->second += hit->count;
+                }
             }
         }
-
     }
     
     

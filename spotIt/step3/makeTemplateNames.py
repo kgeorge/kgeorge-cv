@@ -89,7 +89,6 @@ def processFieFillTemplateId(fpath):
     (head, tail) = os.path.split(fpath)
     (tailName, ext) = os.path.splitext(tail)
     templateId = gTemplateMap.get(tailName, None)
-    assert(templateId >= 0)
     tree = ET.parse(fpath)
     n = tree.find('SpotItHash/name')
     n.text = tailName
@@ -172,6 +171,8 @@ def fun(argdir):
     mergedIndices = set()
     l = [mergedTree]
     for root,dir,files in os.walk(argdir):
+        if (root.endswith("test") or root.endswith("dump")):
+            continue
         for item in fnmatch.filter(files, "*.xml"):
             (fileName, ext) = os.path.splitext(item)
             if fileName.endswith("_c"):
@@ -199,6 +200,9 @@ def funFillTemplateId(argdir):
     makeTemplateMap(gTemplateNames, gTemplateMap)
     print "%r" % gTemplateMap
     for root,dir,files in os.walk(argdir):
+        if (root.endswith("test") or root.endswith("dump")):
+            continue
+
         for item in fnmatch.filter(files, "*.xml"):
             (title, ext) = os.path.splitext(item)
             if( title.endswith("_c")):
@@ -216,8 +220,8 @@ def funVerifyNumEntries(argdir):
 
 
 if __name__ == "__main__":
-    #fun("./data")
-    funFillTemplateId("./data")
+    fun("./data")
+    #funFillTemplateId("./data")
     pass
 
 

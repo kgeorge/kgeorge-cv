@@ -16,11 +16,14 @@
 #include <set>
 #include <random>
 
+#include <Eigen/Core>
+#include <Eigen/Dense>
 
 
 #include "kgUtils.hpp"
 #include "kgKernel.hpp"
 #include "kgLocalitySensitiveHash.hpp"
+#include "kgLeastSquaresTransform.hpp"
 
 template< typename TTemplate, typename TTraits=KgGeometricHash_Traits<TTemplate> >
 struct TemplateExtra_ {
@@ -66,6 +69,57 @@ void TemplateExtra_<TTemplate, TTraits>::compute(ForwardIter b, ForwardIter e) {
     }
 }
 
+template< typename TTemplate>
+struct PointCorrespondence {
+    typedef typename TTemplate::value_type T;
+    typedef int PointIdInQueryModel;
+    typedef  KgGeometricHash_Traits<T> TTraits;
+    typedef typename TTraits::K K;
+    struct Record {
+        Record(const T& templatePoint, int count):templatePoint(templatePoint),count(count){}
+        Record & operator=(const Record &rhs) {
+            templatePoint = rhs.templatePoint;
+            count = rhs.count;
+            return *this;
+        }
+        //Record(const Record &rhs):templatePoint(rhs.templatePoint),count(rhs.count){}
+        const T &templatePoint;
+        int count;
+     };
+    typedef typename std::map<PointIdInQueryModel, Record>::value_type value_type;
+    PointCorrespondence(const TTemplate &refData, const T &centroid):refData(refData),templateCentroid(centroid){}
+    const TTemplate &refData;
+    T templateCentroid;
+    std::map<PointIdInQueryModel, Record>  data;
+    K foo(Eigen::MatrixXf &transform) {
+        auto cit = data.begin();
+        int idx=0;
+        Eigen::Matrix<K, Eigen::Dynamic, 3>A(data.size(), 3), B(data.size(), 3);
+        for( ; cit != data.end(); ++cit, ++idx) {
+            int pointId = cit->first;
+            T pt = refData[pointId];
+            pt -=  templateCentroid;
+            Record &rec = cit->second;
+            TTraits::fill(pt, idx, A );
+            //std::cout << rec.templatePoint << std::endl;
+            TTraits::fill(rec.templatePoint, idx, B );
+        }
+        LeastSquaresTransform<T> lst;
+        /*
+        std::cout << "A" << std::endl;
+        std::cout << A;
+        std::cout << "~~~~~~~~~~~~~" << std::endl;
+        std::cout << B;
+        std::cout << std::endl;
+         */
+        lst(A, B, transform);
+        std::cout << "transform: " << transform << std::endl;
+        Eigen::Matrix<K, Eigen::Dynamic, 3> C = A * transform;
+        return (C - B).norm();
+    }
+
+
+};
 
 template< typename TTemplate, typename Q  >
 class KgGeometricHash {
@@ -76,6 +130,8 @@ public:
     typedef typename TTemplate::value_type T;
     typedef  KgGeometricHash_Traits<T> TTraits;
     typedef typename TTraits::K K;
+    typedef PointCorrespondence<TTemplate> TPointCorrespondence;
+    typedef typename TPointCorrespondence::Record TPointCorrespondenceRecord;
     
     KgGeometricHash(){
         
@@ -118,7 +174,8 @@ public:
     template<typename LSHashEntry, typename LSHashTraits>
     void queryTemplateSet(
         LocalitySensitiveHash<T, LSHashEntry, 3, LSHashTraits> &lsHash,
-        std::vector<std::map<int,int>> &templateMatches);
+        std::vector<std::map<int,int>> &templateMatches,
+        std::map<int, std::vector<cv::Point2f> > &pointClusterMap);
 
     K maxValX;
     K minValX;
@@ -168,6 +225,8 @@ void KgGeometricHash<TTemplate, Q >::processTemplateSet(K w, LocalitySensitiveHa
                     } else if( isLeftRightOrOn > 1) {
                         std::swap(l, r);
                     }
+                    T lMinusCentroid = l - templateCentroid;
+                    T rMinusCentroid = r - templateCentroid;
                     T diff = r-l;
                     T centroidOfBase = (r + l) * static_cast<K>(0.5);
                     K d = TTraits::distSqrd(r, l);
@@ -190,17 +249,13 @@ void KgGeometricHash<TTemplate, Q >::processTemplateSet(K w, LocalitySensitiveHa
                         maxValY = (quantizer(projection.y) > maxValY) ? quantizer(projection.y) : maxValY;
                         minValX = (quantizer(projection.x) < minValX) ? quantizer(projection.x) : minValX;
                         minValY = (quantizer(projection.y) < minValY) ? quantizer(projection.y) : minValY;
-                        LSHashEntry he(l, r);
+                        LSHashEntry he(lMinusCentroid, rMinusCentroid);
                         lsHash.index(projection, he);
                     }
                 }
-                
             }
         }
     }
-    //std::cout << "///////////////////////////////////////////////////" << std::endl;
-    //std::cout << "maximum:  x: " << maxValX <<  ", " << maxValY << ", minimum: " << minValX <<   ",  " << minValY << std::endl;
-    
 }
 
 
@@ -209,12 +264,14 @@ template< typename TTemplate, typename Q>
 template<typename LSHashEntry, typename LSHashTraits>
 void KgGeometricHash<TTemplate, Q >::queryTemplateSet(
     LocalitySensitiveHash<T, LSHashEntry, 3, LSHashTraits> &lsHash,
-    std::vector<std::map<int,int>> &templateMatches) {
+    std::vector<std::map<int,int>> &templateMatches,
+    std::map<int, std::vector<cv::Point2f>> &pointClusterMap ) {
     std::cout << "querying " << std::endl;
     templateMatches.resize(queue_.size());
     int queueIdx =0;
     for(auto qit= queue_.begin(); qit != queue_.end(); ++qit, ++queueIdx) {
         const TTemplate *t = *qit;
+        std::map<int, TPointCorrespondence > pointCorrespondenceMap;
         TemplateExtra_<TTemplate, TTraits> extra;
         extra.compute(t->begin(), t->end());
         std::less< T > lessT;
@@ -228,11 +285,15 @@ void KgGeometricHash<TTemplate, Q >::queryTemplateSet(
                 templateCentroid = templateCentroid +  *pointIt;
             }
             templateCentroid = templateCentroid  * reciprocal;
+        } else {
+            continue;
         }
 
-        for(auto pointIt =  t->begin(); pointIt != t->end(); ++pointIt ) {
+        int lPointIdx =0;
+        for(auto pointIt =  t->begin(); pointIt != t->end(); ++pointIt, ++lPointIdx) {
             auto nextPointIt = pointIt + 1;
-            for( ; nextPointIt != t->end(); ++nextPointIt) {
+            int rPointIdx = lPointIdx + 1;
+            for( ; nextPointIt != t->end(); ++nextPointIt, ++rPointIdx) {
                 if( TTraits::distSqrd(*pointIt, *nextPointIt) >= limitDistanceBetweenPoints ) {
                     T l(*pointIt), r(*nextPointIt);
                     int isLeftRightOrOn = TTraits::leftRightOrOn(l, r, templateCentroid);
@@ -240,7 +301,11 @@ void KgGeometricHash<TTemplate, Q >::queryTemplateSet(
                         continue;
                     } else if( isLeftRightOrOn > 1) {
                         std::swap(l, r);
+                        std::swap(lPointIdx, rPointIdx);
                     }
+
+                    T lMinusCentroid = l - templateCentroid;
+                    T rMinusCentroid = r - templateCentroid;
                     T diff = r-l;
                     T centroidOfBase = (r + l) * static_cast<K>(0.5);
                     K d = TTraits::distSqrd(r, l);
@@ -255,8 +320,8 @@ void KgGeometricHash<TTemplate, Q >::queryTemplateSet(
                     TTraits::negate(yAxisNeg);
 
                     auto allPointsIt = t->begin();
-                    std::less<LSHashEntry> le;
-                    std::map<LSHashEntry, int, std::less<LSHashEntry> > templateMatch(le);
+                    std::less<LSHashEntry*> le;
+                    std::map<const LSHashEntry *, int, std::less<LSHashEntry*> > templateMatch(le);
                     for( allPointsIt = t->begin(); allPointsIt != t->end(); ++allPointsIt ) {
                         const T &currentPoint = *allPointsIt;
                         T currentDiff = currentPoint - centroidOfBase;
@@ -265,27 +330,99 @@ void KgGeometricHash<TTemplate, Q >::queryTemplateSet(
                         maxValY = (quantizer(projection.y) > maxValY) ? quantizer(projection.y) : maxValY;
                         minValX = (quantizer(projection.x) < minValX) ? quantizer(projection.x) : minValX;
                         minValY = (quantizer(projection.y) < minValY) ? quantizer(projection.y) : minValY;
-                        LSHashEntry he(l, r);
+                        LSHashEntry he(lMinusCentroid, rMinusCentroid);
                         lsHash.query(projection, he, templateMatch);
                     }
                     int maxCount =0;
+                    std::map< int, std::pair<const LSHashEntry*, int> > templateResults;
                     auto titWithMaxCount = templateMatch.begin();
                     for(auto tit = templateMatch.begin(); tit != templateMatch.end(); ++tit) {
-                        if( maxCount < tit->second ) {
-                            maxCount = Kg::max<int>(tit->second, maxCount);
-                            titWithMaxCount = tit;
+                        auto tResultIt = templateResults.find(tit->first->templateId);
+                        if ( tResultIt == templateResults.end()) {
+                            const LSHashEntry *e = tit->first;
+                            std::pair<int, std::pair<const LSHashEntry*, int> > insertData( tit->first->templateId, std::pair<const LSHashEntry*, int>(e, tit->second));
+                            templateResults.insert( insertData );
+                            //std::cout << tit->first.templateId << ", " <<   e.l << ", " << e.r << std::endl;
+                        } else {
+                            std::pair<const LSHashEntry*, int> & tResultItSecond = tResultIt->second;
+                            if( tResultItSecond.second < tit->second ) {
+                                const LSHashEntry *e = tit->first;
+                                tResultIt->second = std::pair<const LSHashEntry*, int>(e, tit->second);
+                                //std::cout << tit->first.templateId << ", " <<   e.l << ", " << e.r << std::endl;
+                            }
                         }
                     }
+                    for(auto tResultIt = templateResults.begin(); tResultIt != templateResults.end(); ++tResultIt) {
+                        int possibleTemplateId = tResultIt->first;
+                        //std::cout << tResultIt->first << ", " << tResultIt->second.first << ", " << tResultIt->second.second << std::endl;
+                        auto ptCorrespIt = pointCorrespondenceMap.find( possibleTemplateId  );
+                        if(ptCorrespIt == pointCorrespondenceMap.end()) {
+                            pointCorrespondenceMap.insert( std::pair<int, TPointCorrespondence >(possibleTemplateId,  TPointCorrespondence(*t, templateCentroid)));
+                        }
+                        auto ptCorrespIt2 = pointCorrespondenceMap.find(possibleTemplateId);
+                        TPointCorrespondence & ptCorresp = ptCorrespIt2->second;
 
-                    std::cout << titWithMaxCount->first << ", " << titWithMaxCount->second << std::endl;
+                        const std::pair<const LSHashEntry*, int> &matchResult = tResultIt->second;
+
+                        const T & tleft = TTraits::left(*(matchResult.first));
+                        const T & tright = TTraits::right(*(matchResult.first));
+
+                        TPointCorrespondenceRecord leftRecord (tleft, matchResult.second);
+                        TPointCorrespondenceRecord rightRecord(tright, matchResult.second);
+
+                        typename TPointCorrespondence::value_type ptCorresp_left(lPointIdx, leftRecord);
+                        typename TPointCorrespondence::value_type ptCorresp_right(rPointIdx, rightRecord);
+
+
+
+                        auto pit = ptCorresp.data.find( lPointIdx );
+                        if(pit == ptCorresp.data.end() ) {
+                            ptCorresp.data.insert( ptCorresp_left );
+                            //std::cout << possibleTemplateId << "adding " << ptCorresp_left.second.templatePoint << std::endl;
+                        } else {
+                            const TPointCorrespondenceRecord &existingRecord = pit->second;
+                            if( existingRecord.count < ptCorresp_left.second.count ) {
+                                ptCorresp.data.erase(pit);
+                                //std::cout << possibleTemplateId << "adding " << ptCorresp_left.second.templatePoint << std::endl;
+                                ptCorresp.data.insert( ptCorresp_left );
+                            }
+                        }
+
+                        pit = ptCorresp.data.find( rPointIdx );
+                        if(pit == ptCorresp.data.end() ) {
+                            ptCorresp.data.insert( ptCorresp_right );
+                            //std::cout << possibleTemplateId << "adding " << ptCorresp_right.second.templatePoint << std::endl;
+                        } else {
+                            const TPointCorrespondenceRecord &existingRecord = pit->second;
+                            if( existingRecord.count < ptCorresp_right.second.count ) {
+                                ptCorresp.data.erase(pit);
+                                //std::cout << possibleTemplateId << "adding " << ptCorresp_right.second.templatePoint << std::endl;
+                                ptCorresp.data.insert( ptCorresp_right );
+                            }
+                        }
+
+                    }
                 }
-
             }
         }
-    }
-    //std::cout << "///////////////////////////////////////////////////" << std::endl;
-    //std::cout << "maximum:  x: " << maxValX <<  ", " << maxValY << ", minimum: " << minValX <<   ",  " << minValY << std::endl;
 
+        //std::cout << "///////////////////////////////////////////////////" << std::endl;
+        //std::cout << "maximum:  x: " << maxValX <<  ", " << maxValY << ", minimum: " << minValX <<   ",  " << minValY << std::endl;
+        auto mit = pointCorrespondenceMap.begin();
+        for(; mit != pointCorrespondenceMap.end(); ++mit) {
+            int templateId = mit->first;
+            TPointCorrespondence &corresp = mit->second;
+            for(auto p = corresp.data.begin(); p != corresp.data.end(); ++p) {
+                std::cout << templateId << ", " <<  p->first << ": " << p->second.templatePoint << std::endl;
+            }
+            Eigen::MatrixXf mat;
+            std::cout << "!!!!!!!!!: " << templateId << std::endl;
+            float fnorm = corresp.foo(mat);
+            int i = 90;
+            std::cout << templateId << ": " << fnorm << std::endl;
+            std::cout << "@@@@@@@@@@@@@@@@@@@@" << std::endl;
+        }
+    }
 }
 
 #endif //KG_GEOMETRIC_HASH_H_

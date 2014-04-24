@@ -370,7 +370,8 @@ void SpotIt::geometricHashQuerying( int pointClusterIndex) {
     auto whichClusterIter =  pointClusters.begin() + pointClusterIndex;
     KgGeometricHash<vector<Point2f>,  Quantizer<float> >  geomHash(whichClusterIter, whichClusterIter+1);
     vector<map<int, int> > templateMatches;
-    geomHash.queryTemplateSet(lsHash, templateMatches);
+    map<int, vector<Point2f>> pointClusterMap;
+    geomHash.queryTemplateSet(lsHash, templateMatches, pointClusterMap);
     for(int i=0; i < templateMatches.size(); ++i) {
         map<int, int> &templateMatch = templateMatches[i];
         std::cout << "template match :" << i << endl;
@@ -497,7 +498,7 @@ bool SpotIt::handleKey(char keyChar) {
                     }
                     cout << "reading file: " << possibleFilePath << endl;
                     fs.release();
-                    vector<Point2f> &pointCluster = pointClusterMap[gTemplateNames[i]];
+                    vector<Point2f> &pointCluster = pointClusterMap[i];
                     std::string name;
                     readPointClusters(possibleFilePath, name,  pointCluster);
                     assert(readName == string(gTemplateName[i]));

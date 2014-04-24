@@ -15,6 +15,8 @@
 #include <functional>
 #include <set>
 #include <random>
+#include <Eigen/Core>
+#include <Eigen/Dense>
 
 
 
@@ -49,6 +51,9 @@ template< typename T >
 struct KgCommon_Traits {
     typedef typename T::value_type I;
     typedef typename AppropriateNonIntegralType<I>::value_type K;
+    static const int numElementsInT = -1;
+    static constexpr int numElementsInTPlus1 = 3;
+    typedef Eigen::Matrix<K, Eigen::Dynamic,  numElementsInTPlus1> TMatrix;
     static K distSqrd(const T &l, const T &r) {
         throw std::runtime_error( "not implemented" );
     }
@@ -72,14 +77,53 @@ struct KgCommon_Traits {
     friend T & operator * ( T &l, K s) {
         throw std::runtime_error( "not implemented" );
     }
+
+    static void fill( const T &arg, int idx,  TMatrix &target) {
+        throw std::runtime_error( "not implemented" );
+    }
 };
 
 template<typename T>
-struct KgGeometricHash_Traits : public KgCommon_Traits<T>{};
+struct KgGeometricHash_Traits : public KgCommon_Traits<T>{
+
+    template< typename LSHEntry>
+    static void foo( const LSHEntry &a) {
+        std::cout << "KgGeometricHash_Traits::foo" << std::endl;
+    }
+
+    template<typename LSHEntry>
+    static const T &left( const LSHEntry &entry) {
+        throw std::runtime_error( "not implemented" );
+        return T();
+    }
+
+
+    template<typename LSHEntry>
+    static const T &right( const LSHEntry &entry) {
+        throw std::runtime_error( "not implemented" );
+        return T();
+    }
+
+
+    template<typename LSHEntry>
+    static T &left( LSHEntry &entry) {
+        throw std::runtime_error( "not implemented" );
+        return T();
+    }
+
+
+    template<typename LSHEntry>
+    static T &right( LSHEntry &entry) {
+        throw std::runtime_error( "not implemented" );
+        return T();
+    }
+};
 
 template<typename T>
 struct KgLocalitySensitiveHash_Traits : public KgCommon_Traits<T>{};
 
+template<typename T>
+struct KgLeastSquaresTransform_Traits : public KgCommon_Traits<T>{};
 
 
 template<typename K>

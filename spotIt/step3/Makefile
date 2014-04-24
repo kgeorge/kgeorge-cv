@@ -15,6 +15,9 @@ ifeq ($(DEBUG), 1)
 	# for now just use the release config
 	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/lib/release
 	GTEST-INCLUDES = -I$(GIT_ROOT)/thirdparty/gtest-1.7.0/include
+	EIGEN-LIBS = $(shell /usr/local/bin/pkg-config --libs eigen3)
+    EIGEN-INCLUDES=$(shell /usr/local/bin/pkg-config --cflags eigen3)
+
 else
 	CONFIG=RELEASE
 	FORGIVING-CXXFLAGS=-Wno-unused-variable -Wno-reorder  -D NDEBUG
@@ -22,6 +25,8 @@ else
 	OPENCV-LIBS-DIR = $(shell /usr/local/bin/pkg-config --libs opencv | dirname `awk '{ print $$1 }'`)
 	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/lib/release
 	GTEST-INCLUDES = -I$(GIT_ROOT)/thirdparty/gtest-1.7.0/include
+	EIGEN-LIBS = $(shell /usr/local/bin/pkg-config --libs eigen3)
+    EIGEN-INCLUDES=$(shell /usr/local/bin/pkg-config --cflags eigen3)
 endif
 
 
@@ -54,8 +59,8 @@ GTEST-LIBS=\
 
 
 CXX=clang++
-CXXFLAGS=-g -Wall -Wno-deprecated $(FORGIVING-CXXFLAGS) -std=c++11 -D WITH_OPENGL  $(OPENCV-INCLUDES)
-LDFLAGS= $(OPENCV-LIBS)
+CXXFLAGS=-g -Wall -Wno-deprecated $(FORGIVING-CXXFLAGS) -std=c++11 -D WITH_OPENGL  $(OPENCV-INCLUDES) $(EIGEN-INCLUDES)
+LDFLAGS= $(OPENCV-LIBS) $(EIGEN-LIBS)
 
 BUILD-DIR=build
 MAIN=$(addprefix $(BUILD-DIR)/, main.o )

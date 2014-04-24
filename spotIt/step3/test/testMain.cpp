@@ -13,26 +13,6 @@ TEST( LocalitySensitiveHashing, PStable) {
     
     std::mt19937 gen(42);
     std::uniform_real_distribution<float> udist(1.0f, 2.0f);
-    /*
-     Point2f p1(-40.0f, 20.0f);
-     hashEngine(p1, hashOutput1);
-     cout << hashOutput1[0] << ", " << hashOutput1[1] << ", " << hashOutput1[2] << endl;
-     
-     for(int i=0; i < 1000; ++i) {
-     int hashOutput[3];
-     int hashDiff[3];
-     Point2f delta  = Point2f(-2.0f + 2.0f * udist(gen), -2.0f + 2.0f * udist(gen));
-     Point2f p = delta + p1;
-     hashEngine(p, hashOutput);
-     hashDiff[0] = hashOutput[0] - hashOutput1[0];
-     hashDiff[1] = hashOutput[1] - hashOutput1[1];
-     hashDiff[2] = hashOutput[2] - hashOutput1[2];
-     if( abs(hashDiff[0]) > 1 && abs(hashDiff[1]) > 1 && abs(hashDiff[2]) > 1  ) {
-     cout << p.x << ", " << p.y << endl;
-     cout << hashOutput[0] << ", " << hashOutput[1] << ", " << hashOutput[2] << endl;
-     }
-     }
-     */
     EXPECT_EQ(1, 1);
 }
 
@@ -91,7 +71,7 @@ TEST( LocalitySensitiveHashing, Serialization1) {
     hashEngine.index(pt1, he1);
     hashEngine.index(pt2, he2);
 
-    const std::string fname("data/testhash1.xml");
+    const std::string fname("data/test/dump/testhash1.xml");
     {
         cv::FileStorage fs(fname, cv::FileStorage::WRITE);
         fs << "HashTable";
@@ -128,7 +108,7 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
     hashEngine.index(pt2, he2);
 
 
-    const std::string fname("data/testhash2.xml");
+    const std::string fname("data/test/dump/testhash2.xml");
     {
         cv::FileStorage fs(fname, cv::FileStorage::WRITE);
         fs << "HashTable";
@@ -156,7 +136,7 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
 
 
 TEST( LocalitySensitiveHashingForGeometricHash, Serialization3) {
-    const std::string fname("data/merged.xml");
+    const std::string fname("data/test/merged.xml");
     LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
 
     {
@@ -198,6 +178,20 @@ TEST( LocalitySensitiveHashingForGeometricHash, ConstancyOfHash) {
 }
 
 
+
+TEST( LocalitySensitiveHashing, AdvanceDiff) {
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
+
+        int output[3];
+        for(int j=0; j < 3; ++j) {
+            output[j] = -1;
+        }
+    for(int i=0; i < 100; ++i) {
+        hashEngine.advanceDiffIndex(output);
+        std::cout << output[0] << ", " << output[1] << ", " << output[2] << std::endl;
+    }
+}
+
 TEST( LocalitySensitiveHashingForGeometricHash, LSHashEntryForGeometricHashOrder) {
     LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
 
@@ -215,6 +209,113 @@ TEST( LocalitySensitiveHashingForGeometricHash, LSHashEntryForGeometricHashOrder
 }
 
 
+
+TEST(LeastSquaresTransform, Transform) {
+    Eigen::MatrixXf A(7, 3), B(7,3);
+    /*
+    A:
+
+   4:
+    |\      A
+    |'\
+    | '\,
+    |   \,
+....|____\.............
+    :    2
+    :
+    :
+                   _,-, 2
+            _,--'-'   |    B
+    :  ,-/~'          |
+....:/'...............|.......
+    :                 4
+
+
+
+    */
+    A << 0, 4, 1,
+        0, 3, 1,
+        0, 2, 1,
+        0, 1, 1,
+        0, 0, 1,
+        1, 0, 1,
+        2, 0, 1;
+
+    B << 0, 0, 1,
+        1, 0, 1,
+        2, 0, 1,
+        3, 0, 1,
+        4, 0, 1,
+        4, 1, 1,
+        4, 2, 1;
+
+    Eigen::MatrixXf T;
+    LeastSquaresTransform<cv::Point2f> lst;
+
+    lst(A, B, T);
+    EXPECT_EQ(T.cols(), 3);
+    EXPECT_EQ(T.rows(), 3);
+    Eigen::MatrixXf TExpected(3,3);
+    TExpected << 0, 1, 0,
+                -1, 0, 0,
+                4, 0, 1;
+    EXPECT_EQ(TExpected.isApprox(T, 0.0001f), true);
+}
+
+
+TEST(LeastSquaresTransform, PointCorrespondence) {
+
+    std::vector<cv::Point2f> rvec(7);
+    rvec[0] = Point2f(0, 4);
+    rvec[1] = Point2f(0, 3);
+    rvec[2] = Point2f(0, 2);
+    rvec[3] = Point2f(0, 1);
+    rvec[4] = Point2f(0, 0);
+    rvec[5] = Point2f(1, 0);
+    rvec[6] = Point2f(2, 0);
+
+    PointCorrespondence< std::vector< cv::Point2f >> ptCorresp(rvec, Point2f());
+    {
+        PointCorrespondence< std::vector< cv::Point2f > >::Record rec(Point2f(0, 0), 1);
+        ptCorresp.data.insert(pair<int, PointCorrespondence< std::vector< cv::Point2f > >::Record >( 0, rec));
+    }
+
+    {
+        PointCorrespondence< std::vector< cv::Point2f > >::Record rec(Point2f(1, 0), 1);
+        ptCorresp.data.insert(pair<int, PointCorrespondence< std::vector< cv::Point2f > >::Record >( 1, rec));
+    }
+
+    {
+        PointCorrespondence< std::vector< cv::Point2f > >::Record rec(Point2f(2, 0), 1);
+        ptCorresp.data.insert(pair<int, PointCorrespondence< std::vector< cv::Point2f > >::Record >( 2, rec));
+    }
+
+    {
+        PointCorrespondence< std::vector< cv::Point2f > >::Record rec(Point2f(3, 0), 1);
+        ptCorresp.data.insert(pair<int, PointCorrespondence< std::vector< cv::Point2f > >::Record >( 3, rec));
+    }
+
+    {
+        PointCorrespondence< std::vector< cv::Point2f > >::Record rec(Point2f(4, 0), 1);
+        ptCorresp.data.insert(pair<int, PointCorrespondence< std::vector< cv::Point2f > >::Record >( 4, rec));
+    }
+
+    {
+        PointCorrespondence< std::vector< cv::Point2f > >::Record rec(Point2f(4, 1), 1);
+        ptCorresp.data.insert(pair<int, PointCorrespondence< std::vector< cv::Point2f > >::Record >( 5, rec));
+    }
+
+    {
+        PointCorrespondence< std::vector< cv::Point2f > >::Record rec(Point2f(4, 2), 1);
+        ptCorresp.data.insert(pair<int, PointCorrespondence< std::vector< cv::Point2f > >::Record >( 6, rec));
+    }
+    Eigen::MatrixXf T;
+    float f = ptCorresp.foo(T);
+    f = f;
+}
+
+
+
 TEST( SpotIt, Write) {
     vector< vector< Point2f > > ptClusters(2);
     ptClusters[0].reserve(2);
@@ -226,12 +327,12 @@ TEST( SpotIt, Write) {
     ptClusters[1].push_back(Point2f(100, 100));
     SpotIt sp(NULL, NULL);
 
-    sp.writePointClusters("foo.xml", "blue", ptClusters[0], Point2f());
+    sp.writePointClusters("data/test/dump/foo.xml", "blue", ptClusters[0], Point2f());
     
     vector< vector< Point2f > > ptClusters2;
     ptClusters2.resize(2);
     std::string readName;
-    sp.readPointClusters("foo.xml", readName, ptClusters2[0]);
+    sp.readPointClusters("data/test/dump/foo.xml", readName, ptClusters2[0]);
 
     EXPECT_EQ(ptClusters[0][0], ptClusters2[0][0]);
     

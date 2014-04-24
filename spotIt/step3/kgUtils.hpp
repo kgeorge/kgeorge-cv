@@ -68,6 +68,16 @@ namespace Kg {
             
         }
     };
+
+    template<int i, int n> struct Pow{
+        enum { value = i * Pow<i, n-1>::value};
+    };
+
+
+    template<int i> struct Pow<i,1>{
+        enum {value = i};
+    };
+
 }
 
 
