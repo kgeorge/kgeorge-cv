@@ -18,7 +18,7 @@
 #include <opencv2/video/background_segm.hpp>
 
 #include "spotIt.hpp"
-#include "kgUtils.hpp"
+#include "kgeorge_cv/kgUtils.hpp"
 
 
 using namespace std;

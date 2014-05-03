@@ -21,9 +21,9 @@
 #include <opencv2/nonfree/nonfree.hpp>
 
 
-#include "kgUtils.hpp"
-#include "kgLocalitySensitiveHash.hpp"
-#include "kgGeometricHash.hpp"
+#include "kgeorge_cv/kgUtils.hpp"
+#include "kgeorge_cv/kgLocalitySensitiveHash.hpp"
+#include "kgeorge_cv/kgGeometricHash.hpp"
 
 template<>
 struct KgCommon_Traits< cv::Point2f >{
@@ -85,7 +85,6 @@ struct KgCommon_Traits< cv::Point2f >{
 template<>
 struct KgGeometricHash_Traits<cv::Point2f> : public KgCommon_Traits<cv::Point2f>{
 
-
     template< typename LSHEntry>
     static void foo( const LSHEntry &a) {
         std::cout << "KgGeometricHash_Traits::foo" << std::endl;
@@ -97,13 +96,11 @@ struct KgGeometricHash_Traits<cv::Point2f> : public KgCommon_Traits<cv::Point2f>
         return entry.l;
     }
 
-
     template<typename LSHEntry>
     static const T &right( const LSHEntry &entry) {
         //throw std::runtime_error( "not implemented" );
         return entry.r;
     }
-
 
     template<typename LSHEntry>
     static T &left( LSHEntry &entry) {
@@ -117,7 +114,6 @@ struct KgGeometricHash_Traits<cv::Point2f> : public KgCommon_Traits<cv::Point2f>
         //throw std::runtime_error( "not implemented" );
         return entry.r;
     }
-
 
 };
 
@@ -168,6 +164,32 @@ struct LSHashEntryForGeometricHash {
         count = (int)node["count"];
     }
 };
+
+template<>
+struct StatsForLSHashEntry<LSHashEntryForGeometricHash> {
+    typedef LSHashEntryForGeometricHash LSHashEntry;
+
+    void operator()(const LSHashEntry &rhs) {
+        auto mit = totalNumEntriesPerTemplate.find(rhs.templateId);
+        if(mit == totalNumEntriesPerTemplate.end()) {
+            totalNumEntriesPerTemplate.insert( std::pair<int, int>(rhs.templateId, rhs.count));
+        } else {
+            mit->second += rhs.count;
+        }
+    }
+    std::map< int, int> totalNumEntriesPerTemplate;
+
+    std::ostream & output( std::ostream &o) {
+        o << "!!!!!!!!!!!!!!!!!!!" << std::endl;
+        o << "Locality sensitive hash output" << std::endl;
+        for(auto mit =totalNumEntriesPerTemplate.begin(); mit != totalNumEntriesPerTemplate.end(); ++mit ) {
+            o << mit->first << ", " << mit->second << std::endl;
+        }
+        return o;
+    }
+};
+
+
 
 inline std::ostream & operator << ( std::ostream &o, const LSHashEntryForGeometricHash & rhs) {
     o << rhs.templateId << ", (" << rhs.l.x << ", " << rhs.l.y << "), (" << rhs.r.x << ", " << rhs.r.y << ")";

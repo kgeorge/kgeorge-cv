@@ -2,7 +2,7 @@
 
 #for building debug configuraion, call make by 'make DEBUG=1'
 DEBUG ?= 0
-GIT_ROOT=./../..
+GIT_ROOT=./..
 ifeq ($(DEBUG), 1)
 	CONFIG=DEBUG
 	#
@@ -16,8 +16,8 @@ ifeq ($(DEBUG), 1)
 	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/lib/release
 	GTEST-INCLUDES = -I$(GIT_ROOT)/thirdparty/gtest-1.7.0/include
 	EIGEN-LIBS = $(shell /usr/local/bin/pkg-config --libs eigen3)
-    EIGEN-INCLUDES=$(shell /usr/local/bin/pkg-config --cflags eigen3)
-    KGEORGECV-INCLUDES= -I$(GIT_ROOT)/include
+	EIGEN-INCLUDES=$(shell /usr/local/bin/pkg-config --cflags eigen3)
+	KGEORGECV-INCLUDES= -I$(GIT_ROOT)/include
 else
 	CONFIG=RELEASE
 	FORGIVING-CXXFLAGS=-Wno-unused-variable -Wno-reorder  -D NDEBUG
@@ -26,8 +26,8 @@ else
 	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/lib/release
 	GTEST-INCLUDES = -I$(GIT_ROOT)/thirdparty/gtest-1.7.0/include
 	EIGEN-LIBS = $(shell /usr/local/bin/pkg-config --libs eigen3)
-    EIGEN-INCLUDES=$(shell /usr/local/bin/pkg-config --cflags eigen3)
-    KGEORGECV-INCLUDES= -I$(GIT_ROOT)/include
+	EIGEN-INCLUDES=$(shell /usr/local/bin/pkg-config --cflags eigen3)
+	KGEORGECV-INCLUDES= -I$(GIT_ROOT)/include
 endif
 
 
@@ -69,34 +69,27 @@ OBJS=$(addprefix $(BUILD-DIR)/, spotIt.o)
 PROG=$(BUILD-DIR)/spotIt
 
 
-TESTOBJS=$(addprefix $(BUILD-DIR)/test/, testMain.o)
-TESTPROG=$(BUILD-DIR)/testSpotIt
+TESTOBJS=$(addprefix $(BUILD-DIR)/, testMain.o)
+TESTPROG=$(BUILD-DIR)/testMain
 
-all: $(PROG) $(TESTPROG)
+all:  $(TESTPROG)
 
 #order-only-prerequisites
-$(OBJS): | $(BUILD-DIR)
 #order-only-prerequisites
 $(TESTOBJS) : | $(BUILD-DIR)
 
-$(PROG): $(OBJS) $(MAIN)
-	$(CXX) -v -o $(PROG) $(OBJS) $(MAIN) $(LDFLAGS)
 
-$(TESTPROG): $(TESTOBJS) $(PROG)
-	$(CXX) -v -o $(TESTPROG) $(OBJS) $(TESTOBJS) $(LDFLAGS) $(GTEST-LIBS)
+$(TESTPROG): $(TESTOBJS) 
+	$(CXX) -v -o $(TESTPROG)  $(TESTOBJS) $(LDFLAGS) $(GTEST-LIBS)
 
 
-$(BUILD-DIR)/test/%.o: test/%.cpp
+$(BUILD-DIR)/%.o: %.cpp
 	@echo compiling $(CONFIG) configuration for test
 	$(CXX) -c $(CXXFLAGS) $(GTEST-INCLUDES) -o $@ $<
 
-$(BUILD-DIR)/%.o: %.cpp
-	@echo compiling $(CONFIG)  configuration
-	# eg: $@ == build/spotIt.o $< == spotIt.cpp
-	$(CXX) -c $(CXXFLAGS) -o $@ $<
 
 $(BUILD-DIR):
-	mkdir -p $(BUILD-DIR)/test
+	mkdir -p $(BUILD-DIR)
 
 clean:
 	rm -rf build

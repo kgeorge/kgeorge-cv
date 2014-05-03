@@ -2,7 +2,35 @@
 //
 //      author: koshy george, kgeorge2@gmail.com, copyright 2014
 //      please read license.txt provided
-//      free-bsd-license
+/*
+Copyright (c) 2014, kgeorge
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the {organization} nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
 /********************************************************************************/
 #if !defined(KG_LOCALITY_SENSITIVE_HASH_)
 #define KG_LOCALITY_SENSITIVE_HASH_
@@ -30,6 +58,19 @@ struct HashTableValue {
     }
 };
 
+
+template<typename LSHashEntry>
+struct StatsForLSHashEntry {
+
+    void operator()(const LSHashEntry &rhs) {
+
+
+    }
+
+    std::ostream & output( std::ostream &o) {
+        return o;
+    }
+};
 
 template<typename T, typename LSHashEntry,  int numBuckets, typename TTraits = KgLocalitySensitiveHash_Traits< T >  >
 struct LocalitySensitiveHash {
@@ -245,6 +286,7 @@ struct LocalitySensitiveHash {
         int numEntriesReported = (int)fn["numEntries"];
         K w = (K)fn["windowSize"];
         resize(w, minRange, maxRange);
+        StatsForLSHashEntry<LSHashEntry> stats;
         
         cv::FileNode data = fn["data"];                         // Read string sequence - Get node
         if (data.type() != cv::FileNode::SEQ)
@@ -272,10 +314,12 @@ struct LocalitySensitiveHash {
                 LSHashEntry he;
                 (*it_2) >> he;
                 hashTable[index].data.push_back(he);
+                stats(he);
                 ++numEntries;
             }
         }
         assert(numEntriesReported == numEntries);
+        stats.output(std::cout);
     }
 
     protected:

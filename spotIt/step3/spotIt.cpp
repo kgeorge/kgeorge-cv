@@ -18,9 +18,9 @@
 #include <opencv2/nonfree/nonfree.hpp>
 
 #include "spotIt.hpp"
-#include "kgUtils.hpp"
-#include "kMeansClustering.hpp"
-#include "kgGeometricHash.hpp"
+#include "kgeorge_cv/kgUtils.hpp"
+#include "kgeorge_cv/kMeansClustering.hpp"
+#include "kgeorge_cv/kgGeometricHash.hpp"
 
 using namespace std;
 using namespace cv;
@@ -800,7 +800,8 @@ struct KMeansDataElementTraits<ClusterItem>{
 //hue value weight = 5
 //unused component weight = 0
 //sum of all weights = 11
-const float KMeansDataElementTraits<ClusterItem>::weights[] = {3,3,5,0,11};
+//const float KMeansDataElementTraits<ClusterItem>::weights[] = {3,3,5,0,11};
+const float KMeansDataElementTraits<ClusterItem>::weights[] = {1,1,1,0,3};
 
 
 //order the element
