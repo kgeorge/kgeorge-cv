@@ -71,6 +71,10 @@ namespace Kg {
     T max( T a, T b ) {
         return a >= b ? a: b;
     }
+    template<typename T>
+    T clamp(T val, T mni, T mxa) {
+        return (val < mni)? mni : (val > mxa) ? mxa: val;
+    }
     
     //A utility class that collects float samples
     //and keeps track of current, mean, variance and numSamples

@@ -164,6 +164,8 @@ public:
     typedef typename TTraits::K K;
     typedef PointCorrespondence<TTemplate> TPointCorrespondence;
     typedef typename TPointCorrespondence::Record TPointCorrespondenceRecord;
+    static const int kLSHashNumFields=3;
+    static const int kLSHashNumBuckets=1;
     
     KgGeometricHash(){
         
@@ -201,11 +203,11 @@ public:
     }
     
     template<typename LSHashEntry, typename LSHashTraits>
-    void processTemplateSet(K w, LocalitySensitiveHash<T, LSHashEntry, 3, LSHashTraits> &lsHash);
+    void processTemplateSet(K w, LocalitySensitiveHash<T, LSHashEntry, kLSHashNumFields, kLSHashNumBuckets, LSHashTraits> &lsHash);
 
     template<typename LSHashEntry, typename LSHashTraits>
     void queryTemplateSet(
-        LocalitySensitiveHash<T, LSHashEntry, 3, LSHashTraits> &lsHash,
+        LocalitySensitiveHash<T, LSHashEntry, kLSHashNumFields, kLSHashNumBuckets, LSHashTraits> &lsHash,
         std::vector<std::map<int,int>> &templateMatches,
         std::map<int, std::vector<cv::Point2f> > &pointClusterMap);
 
@@ -228,7 +230,7 @@ protected:
 
 template< typename TTemplate, typename Q>
 template<typename LSHashEntry, typename LSHashTraits>
-void KgGeometricHash<TTemplate, Q >::processTemplateSet(K w, LocalitySensitiveHash<T, LSHashEntry, 3, LSHashTraits> &lsHash) {
+void KgGeometricHash<TTemplate, Q >::processTemplateSet(K w, LocalitySensitiveHash<T, LSHashEntry, kLSHashNumFields, kLSHashNumBuckets, LSHashTraits> &lsHash) {
     for(auto qit= queue_.begin(); qit != queue_.end(); ++qit) {
         const TTemplate *t = *qit;
         TemplateExtra_<TTemplate, TTraits> extra;
@@ -282,7 +284,8 @@ void KgGeometricHash<TTemplate, Q >::processTemplateSet(K w, LocalitySensitiveHa
                         minValX = (quantizer(projection.x) < minValX) ? quantizer(projection.x) : minValX;
                         minValY = (quantizer(projection.y) < minValY) ? quantizer(projection.y) : minValY;
                         LSHashEntry he(lMinusCentroid, rMinusCentroid);
-                        lsHash.index(projection, he);
+                        int hashTableIndicesCalculated[kLSHashNumBuckets ];
+                        lsHash.index(projection, he, hashTableIndicesCalculated);
                     }
                 }
             }
@@ -295,7 +298,7 @@ void KgGeometricHash<TTemplate, Q >::processTemplateSet(K w, LocalitySensitiveHa
 template< typename TTemplate, typename Q>
 template<typename LSHashEntry, typename LSHashTraits>
 void KgGeometricHash<TTemplate, Q >::queryTemplateSet(
-    LocalitySensitiveHash<T, LSHashEntry, 3, LSHashTraits> &lsHash,
+    LocalitySensitiveHash<T, LSHashEntry, kLSHashNumFields, kLSHashNumBuckets, LSHashTraits> &lsHash,
     std::vector<std::map<int,int>> &templateMatches,
     std::map<int, std::vector<cv::Point2f>> &pointClusterMap ) {
     std::cout << "querying " << std::endl;
@@ -364,7 +367,16 @@ void KgGeometricHash<TTemplate, Q >::queryTemplateSet(
                         minValX = (quantizer(projection.x) < minValX) ? quantizer(projection.x) : minValX;
                         minValY = (quantizer(projection.y) < minValY) ? quantizer(projection.y) : minValY;
                         LSHashEntry he(lMinusCentroid, rMinusCentroid);
-                        lsHash.query(projection, he, templateMatch);
+                        std::deque< std::pair< const T *, const LSHashEntry *> > queryResults;
+                        lsHash.query(projection,  queryResults);
+                        for(auto qit = queryResults.begin(); qit != queryResults.end(); ++qit) {
+                            auto tmatch = templateMatch.find(qit->second);
+                            if(tmatch == templateMatch.end()) {
+                                templateMatch.insert(std::pair<const LSHashEntry*, int>(qit->second, qit->second->count));
+                            } else {
+                                tmatch->second += qit->second->count;
+                            }
+                        }
                     }
                     int maxCount =0;
                     std::map< int, std::pair<const LSHashEntry*, int> > templateResults;

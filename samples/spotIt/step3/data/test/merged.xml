@@ -10,7 +10,7 @@
   <name>apple</name>
   <hashTable>
     <description>"geometric hash"</description>
-    <numBuckets>3</numBuckets>
+    <numFields>3</numFields>
     <minRange>-80.</minRange>
     <maxRange>80.</maxRange>
     <windowSize>1.</windowSize>

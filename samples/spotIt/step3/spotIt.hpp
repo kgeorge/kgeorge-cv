@@ -252,11 +252,14 @@ struct std::less<cv::Point2f> : std::binary_function< cv::Point2f, cv::Point2f, 
 
 struct ClusterItem;
 struct ContourRepresentativePoint;
+const int kLSHashNumFields=3;
+const int kLSHashNumBuckets=1;
 
 typedef LocalitySensitiveHash<
     cv::Point2f,
     LSHashEntryForGeometricHash,
-    3,
+    kLSHashNumFields,
+    kLSHashNumBuckets,
     KgLocalitySensitiveHash_Traits< cv::Point2f >
     > SpotItLocalitySensitiveHashBase;
 

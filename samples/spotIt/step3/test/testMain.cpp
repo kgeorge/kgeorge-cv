@@ -8,7 +8,9 @@ using namespace cv;
 
 
 TEST( LocalitySensitiveHashing, PStable) {
-    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f > > hashEngine(1.0f, -2, 2);
+    const int kLSHashNumFields=3;
+    const int kLSHashNumBuckets=1;
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, kLSHashNumFields, kLSHashNumBuckets, KgLocalitySensitiveHash_Traits< cv::Point2f > > hashEngine(1.0f, -2, 2);
     int hashOutput1[3];
     
     std::mt19937 gen(42);
@@ -61,15 +63,20 @@ static void read(const FileNode& node, TestHashEntry& x, const TestHashEntry& de
 }
 
 TEST( LocalitySensitiveHashing, Serialization1) {
-    LocalitySensitiveHash<Point2f, TestHashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -2, 2);
+
+    const int kLSHashNumFields=3;
+    const int kLSHashNumBuckets=1;
+    LocalitySensitiveHash<Point2f, TestHashEntry, kLSHashNumFields, kLSHashNumBuckets,  KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -2, 2);
 
     Point2f pt1(0.5f, 0.5f), pt2(0.0f, -0.7f);
     TestHashEntry he1(67);
     TestHashEntry he2(54);
 
-    hashEngine.index(pt1, he1);
-    hashEngine.index(pt1, he1);
-    hashEngine.index(pt2, he2);
+    int dummyHashTableIndices[kLSHashNumBuckets];
+
+    hashEngine.index(pt1, he1, dummyHashTableIndices);
+    hashEngine.index(pt1, he1, dummyHashTableIndices);
+    hashEngine.index(pt2, he2, dummyHashTableIndices);
 
     const std::string fname("data/test/dump/testhash1.xml");
     {
@@ -78,7 +85,7 @@ TEST( LocalitySensitiveHashing, Serialization1) {
         hashEngine.serialize(fs);
         fs.release();
     }
-    LocalitySensitiveHash<Point2f, TestHashEntry, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
+    LocalitySensitiveHash<Point2f, TestHashEntry, kLSHashNumFields, kLSHashNumBuckets, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
     {
         cv::FileStorage fs(fname, cv::FileStorage::READ);
         FileNode fn = fs["HashTable"];
@@ -89,23 +96,30 @@ TEST( LocalitySensitiveHashing, Serialization1) {
     EXPECT_EQ(hashEngine.oneByW, hashEngine2.oneByW);
     EXPECT_EQ(hashEngine.minRange, hashEngine2.minRange);
     EXPECT_EQ(hashEngine.maxRange, hashEngine2.maxRange);
-    EXPECT_EQ(hashEngine.nSizePerBucket, hashEngine2.nSizePerBucket);
-    EXPECT_EQ(hashEngine.nSizeAllBuckets, hashEngine2.nSizeAllBuckets);
+    EXPECT_EQ(hashEngine.nSizePerField, hashEngine2.nSizePerField);
+    EXPECT_EQ(hashEngine.nSizeAllFields, hashEngine2.nSizeAllFields);
     EXPECT_EQ(hashEngine.numEntries, hashEngine2.numEntries);
 }
 
 
 
 TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
-    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f > > hashEngine(1.0f, -2, 2);
+    const int kLSHashNumFields=3;
+    const int kLSHashNumBuckets=1;
+
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, kLSHashNumFields, kLSHashNumBuckets, KgLocalitySensitiveHash_Traits< cv::Point2f > > hashEngine(1.0f, -2, 2);
     
     Point2f pt1(0.5f, 0.5f), pt2(0.0f, -0.7f);
     LSHashEntryForGeometricHash he1(Point2f(0,0), Point2f(0,1));
     LSHashEntryForGeometricHash he2(Point2f(1,0), Point2f(1,1));
-    
-    hashEngine.index(pt1, he1);
-    hashEngine.index(pt1, he1);
-    hashEngine.index(pt2, he2);
+
+
+    int dummyHashTableIndices[kLSHashNumBuckets];
+
+
+    hashEngine.index(pt1, he1, dummyHashTableIndices);
+    hashEngine.index(pt1, he1, dummyHashTableIndices);
+    hashEngine.index(pt2, he2, dummyHashTableIndices);
 
 
     const std::string fname("data/test/dump/testhash2.xml");
@@ -115,7 +129,7 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
         hashEngine.serialize(fs);
         fs.release();
     }
-    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, kLSHashNumFields, kLSHashNumBuckets, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
 
     {
         cv::FileStorage fs(fname, cv::FileStorage::READ);
@@ -127,8 +141,8 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
     EXPECT_EQ(hashEngine.oneByW, hashEngine2.oneByW);
     EXPECT_EQ(hashEngine.minRange, hashEngine2.minRange);
     EXPECT_EQ(hashEngine.maxRange, hashEngine2.maxRange);
-    EXPECT_EQ(hashEngine.nSizePerBucket, hashEngine2.nSizePerBucket);
-    EXPECT_EQ(hashEngine.nSizeAllBuckets, hashEngine2.nSizeAllBuckets);
+    EXPECT_EQ(hashEngine.nSizePerField, hashEngine2.nSizePerField);
+    EXPECT_EQ(hashEngine.nSizeAllFields, hashEngine2.nSizeAllFields);
     EXPECT_EQ(hashEngine.numEntries, hashEngine2.numEntries);
 }
 
@@ -136,8 +150,10 @@ TEST( LocalitySensitiveHashingFirGeometricHash, Serialization2) {
 
 
 TEST( LocalitySensitiveHashingForGeometricHash, Serialization3) {
+    const int kLSHashNumFields=3;
+    const int kLSHashNumBuckets=1;
     const std::string fname("data/test/merged.xml");
-    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, kLSHashNumFields, kLSHashNumBuckets, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine2;
 
     {
         cv::FileStorage fs(fname, cv::FileStorage::READ);
@@ -150,37 +166,44 @@ TEST( LocalitySensitiveHashingForGeometricHash, Serialization3) {
     EXPECT_EQ(1.0, hashEngine2.oneByW);
     EXPECT_EQ(-80, hashEngine2.minRange);
     EXPECT_EQ(80, hashEngine2.maxRange);
-    EXPECT_EQ(160, hashEngine2.nSizePerBucket);
-    EXPECT_EQ(4096000, hashEngine2.nSizeAllBuckets);
+    EXPECT_EQ(160, hashEngine2.nSizePerField);
+    EXPECT_EQ(4096000, hashEngine2.nSizeAllFields);
     //EXPECT_EQ(hashEngine.numEntries, hashEngine2.numEntries);
 }
 
 
 
 TEST( LocalitySensitiveHashingForGeometricHash, ConstancyOfHash) {
-    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
+
+    const int kLSHashNumFields=3;
+    const int kLSHashNumBuckets=1;
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, kLSHashNumFields, kLSHashNumBuckets, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
 
     Point2f pt1(0.5f, 0.5f), pt2(-1.0f, 0.0f), pt3(1.0f, 0.0f);
     LSHashEntryForGeometricHash he1(pt1, pt2);
     LSHashEntryForGeometricHash he2(pt2, pt3);
     LSHashEntryForGeometricHash he3(pt3, pt1);
 
-    int index = hashEngine.index(pt3, he1);
-    for(int i=0; i < 5; ++i) {
-        int index2 =  hashEngine.index(pt3, he1);
-        EXPECT_EQ(index, index2);
+    int hashTableIndicesCalculated[kLSHashNumBuckets];
+    hashEngine.index(pt3, he1, hashTableIndicesCalculated);
+
+    for(int k=0; k < 5; ++k) {
+        int hashTableIndicesCalculated2[kLSHashNumBuckets];
+        hashEngine.index(pt3, he1, hashTableIndicesCalculated2);
+        for(int i=0; i < kLSHashNumBuckets; ++ i) {
+            EXPECT_EQ(hashTableIndicesCalculated[i], hashTableIndicesCalculated2[i]);
+        }
     }
 
-    for(int i=0; i < 5; ++i) {
-        int index2 =  hashEngine.index(pt3, he2);
-        EXPECT_EQ(index, index2);
-    }
 }
 
 
 
 TEST( LocalitySensitiveHashing, AdvanceDiff) {
-    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
+
+    const int kLSHashNumFields=3;
+    const int kLSHashNumBuckets=1;
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, kLSHashNumFields, kLSHashNumBuckets, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
 
         int output[3];
         for(int j=0; j < 3; ++j) {
@@ -193,7 +216,10 @@ TEST( LocalitySensitiveHashing, AdvanceDiff) {
 }
 
 TEST( LocalitySensitiveHashingForGeometricHash, LSHashEntryForGeometricHashOrder) {
-    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, 3, KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
+
+    const int kLSHashNumFields=3;
+    const int kLSHashNumBuckets=1;
+    LocalitySensitiveHash<Point2f, LSHashEntryForGeometricHash, kLSHashNumFields, kLSHashNumBuckets,  KgLocalitySensitiveHash_Traits< cv::Point2f >> hashEngine(1.0f, -4, 4);
 
     Point2f pt1(0.5f, 0.5f), pt2(-1.0f, 0.0f), pt3(1.0f, 0.0f);
     LSHashEntryForGeometricHash he1(pt1, pt2, 1);

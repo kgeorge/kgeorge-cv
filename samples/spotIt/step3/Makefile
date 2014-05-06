@@ -2,7 +2,7 @@
 
 #for building debug configuraion, call make by 'make DEBUG=1'
 DEBUG ?= 0
-GIT_ROOT=./../..
+GIT_ROOT=./../../..
 ifeq ($(DEBUG), 1)
 	CONFIG=DEBUG
 	#

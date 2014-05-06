@@ -50,9 +50,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "kgKernel.hpp"
 
 
-template< typename LSHashEntry>
+template< typename T, typename LSHashEntry>
 struct HashTableValue {
-    std::deque< LSHashEntry > data;
+    std::deque< std::pair<T, LSHashEntry> > data;
     void clear() {
         data.clear();
     }
@@ -72,13 +72,13 @@ struct StatsForLSHashEntry {
     }
 };
 
-template<typename T, typename LSHashEntry,  int numBuckets, typename TTraits = KgLocalitySensitiveHash_Traits< T >  >
+template<typename T, typename LSHashEntry,  int numFields, int numBuckets,  typename TTraits = KgLocalitySensitiveHash_Traits< T >  >
 struct LocalitySensitiveHash {
     typedef typename T::value_type I;
     typedef typename AppropriateNonIntegralType<I>::value_type K;
     static constexpr K zero = static_cast<K>(0);
     static constexpr K one = static_cast<K>(1);
-    static constexpr int numQueryIndices = Kg::Pow<3, numBuckets>::value;
+    static constexpr int numQueryIndices = Kg::Pow<3, numFields>::value;
     LocalitySensitiveHash(K w, K minRange, K maxRange):
         w(w),
         minRange(minRange),
@@ -98,31 +98,32 @@ struct LocalitySensitiveHash {
         resize(w, minRange, maxRange);
     }
 
-    int findIndex( int ret[numBuckets]) {
-        assert(numBuckets == 3);
-        //please rewrite this function in a loop
-        //for nBuckets != 3
-        return ret[2] * nSizePerBucket * nSizePerBucket + ret[1] * nSizePerBucket + ret[0];
+    int findIndex( int ret[numBuckets][numFields], int iBucket) {
+        assert(numFields == 3);
+        int r = ret[iBucket][2] * nSizePerField * nSizePerField + ret[iBucket][1] * nSizePerField + ret[iBucket][0];
+        return r;
     }
 
-    int computeHashTableIndexCore(const T &arg ) {
+    void computeHashTableIndexCore(const T &arg, int retVal[numBuckets] ) {
         K temp;
-        K numSizeBy2 = nSizePerBucket/2;
+        K numSizeBy2 = nSizePerField/2;
+        int hashTableIndex=-1;
         for(int i=0; i < numBuckets; ++i) {
-            temp = TTraits::dot(a[i], arg) + b[i];
-            tempStorage[i] = floor(temp * oneByW);
-            assert(tempStorage[i] >= -numSizeBy2 && tempStorage[i] <= numSizeBy2);
-            tempStorage[i] += numSizeBy2;
-            assert(tempStorage[i] > 0);
+            for(int j=0; j < numFields; ++j) {
+                temp = TTraits::dot(a[i][j], arg) + b[i][j];
+                K tempVal = floor(temp * oneByW);
+                tempStorage[i][j] = Kg::clamp(tempVal, -numSizeBy2, numSizeBy2);
+                assert(tempStorage[i][j] >= -numSizeBy2 && tempStorage[i][j] <= numSizeBy2);
+                tempStorage[i][j] += numSizeBy2;
+                assert(tempStorage[i][j] > 0);
+            }
+            retVal[i] = findIndex(tempStorage, i);
         }
-        int hashTableIndex = findIndex(tempStorage);
-        assert(hashTableIndex < hashTable.size());
-        return hashTableIndex;
     }
 
-    void advanceDiffIndex( int diffIndex[numBuckets]) {
+    void advanceDiffIndex( int diffIndex[numFields]) {
 
-    for(int i=0; i < numBuckets; ++i) {
+    for(int i=0; i < numFields; ++i) {
         if(diffIndex[i] < 1) {
             diffIndex[i] += 1;
             return;
@@ -133,77 +134,89 @@ struct LocalitySensitiveHash {
     }
 
 
-    void computeHashTableIndexCoreQ(const T &arg, int retVal [numQueryIndices] ) {
+    void computeHashTableIndexCoreQ(const T &arg, std::vector<int> &retVal ) {
         K temp;
-       int tempStorage2[numBuckets];
-        K numSizeBy2 = nSizePerBucket/2;
+       int tempStorage2[numBuckets][numFields];
+        K numSizeBy2 = nSizePerField/2;
         for(int i=0; i < numBuckets; ++i) {
-            temp = TTraits::dot(a[i], arg) + b[i];
-            tempStorage[i] = floor(temp * oneByW);
-            assert(tempStorage[i] >= -numSizeBy2 && tempStorage[i] <= numSizeBy2);
-            tempStorage[i] += numSizeBy2;
-            assert(tempStorage[i] > 0);
-        }
-        int diffIndex [numBuckets];
-        for(int i=0; i < numBuckets; ++i) {
-            diffIndex[i] = -1;
-        }
-        for(int j=0; j < numQueryIndices; ++j) {
-            for(int i=0; i < numBuckets; ++i ) {
-                tempStorage2[i] = tempStorage[i] + diffIndex[i];
+            for(int j=0; j < numFields; ++j) {
+                temp = TTraits::dot(a[i][j], arg) + b[i][j];
+                K tempVal = floor(temp * oneByW);
+                tempStorage[i][j] = Kg::clamp(tempVal, -numSizeBy2, numSizeBy2);
+                assert(tempStorage[i][j] >= -numSizeBy2 && tempStorage[i][j] <= numSizeBy2);
+                tempStorage[i][j] += numSizeBy2;
+                assert(tempStorage[i][j] > 0);
             }
-            int hashTableIndex = findIndex(tempStorage2);
+        }
+        for(int i=0; i < numBuckets; ++i) {
+            int hashTableIndex = findIndex(tempStorage, i);
             assert(hashTableIndex < hashTable.size());
-            retVal[j] = hashTableIndex;
-            advanceDiffIndex( diffIndex);
+            retVal.push_back(hashTableIndex);
         }
     }
 
 
-    int index( const T &arg, const LSHashEntry & entry) {
-        int hashTableIndex =  computeHashTableIndexCore(arg);
-        HashTableValue<LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
-        auto hit = hashTableVal.data.begin();
-        int numEntriesOfSameValue =0;
-        bool found = false;
-        for(hit = hashTableVal.data.begin(); hit != hashTableVal.data.end(); ++hit) {
-            if( *hit == entry ) {
-                hit->count++;
-                numEntriesOfSameValue++;
-                found = true;
-            }
-        }
-        if(!found) {
-            LSHashEntry entry_2(entry);
-            entry_2.count++;
-            hashTableVal.data.push_back(entry_2);
+    void insertHashEntryCore( const T &arg, const LSHashEntry &entry, int hashTableIndices[numBuckets] ) {
+        for(int i=0; i < numBuckets; ++i) {
+            int hIndex = hashTableIndices[i];
+            HashTableValue<T, LSHashEntry> &hashTableVal = hashTable[hIndex];
+            auto hit = hashTableVal.data.begin();
+            int numEntriesOfSameValue =0;
+            bool found = false;
+            std::pair<T, LSHashEntry> he(arg, entry);
+            for(hit = hashTableVal.data.begin(); hit != hashTableVal.data.end(); ++hit) {
 
-            ++numEntries;
-            assert(count() == numEntries);
-            if(((numEntries % 100) == 0) && (numEntries >= 100)) {
-                //stats();
+                if( *hit ==  he) {
+                    hit->second.count++;
+                    numEntriesOfSameValue++;
+                    found = true;
+                }
             }
+            if(!found) {
+                std::pair<T, LSHashEntry> hashEntry( arg, entry);
+                hashEntry.second.count++;
+                hashTableVal.data.push_back( hashEntry );
+
+                ++numEntries;
+                assert(count() == numEntries);
+                if(((numEntries % 100) == 0) && (numEntries >= 100)) {
+                    //stats();
+                }
+            }
+            assert( numEntriesOfSameValue <= 1);
         }
-        assert( numEntriesOfSameValue <= 1);
-        return hashTableIndex ;
     }
+
+    void index( const T &arg, const LSHashEntry & entry, int hashTableIndicesReturned[numBuckets]) {
+        computeHashTableIndexCore(arg, hashTableIndicesReturned);
+        insertHashEntryCore(arg, entry, hashTableIndicesReturned);
+    }
+
+    void computeHashTableIndex(const T &arg, int hashTableIndicesReturned[numBuckets] ) {
+        computeHashTableIndexCore(arg, hashTableIndicesReturned);
+    }
+
+
     //std::map<const LSHashEntry *, int, std::less<LSHashEntry*> >
     //void query( const T &arg,  const LSHashEntry & entry, std::map<const LSHashEntry*, int> &templateMatch) {
-    void query( const T &arg,  const LSHashEntry & entry, std::map<const LSHashEntry *, int, std::less<LSHashEntry*> > &templateMatch) {
-        int neighboringIndices[numQueryIndices];
+    void query( const T &arg, std::deque< std::pair<const T*, const LSHashEntry*> > &ret) {
+        std::vector<int> neighboringIndices;
+        neighboringIndices.reserve(2* numBuckets);
         computeHashTableIndexCoreQ(arg, neighboringIndices);
         //int hashTableIndex =  computeHashTableIndexCore(arg);
-        for(int i=0; i < numQueryIndices; ++i) {
+        for(int i=0; i < neighboringIndices.size(); ++i) {
             int hashTableIndex = neighboringIndices[i];
-            HashTableValue<LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
+            assert(hashTableIndex < hashTable.size());
+            HashTableValue<T, LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
             auto hit = hashTableVal.data.begin();
             for(hit = hashTableVal.data.begin(); hit != hashTableVal.data.end(); ++hit) {
-                assert(hit->templateId >=0);
-                auto tmatch = templateMatch.find(&(*hit));
-                if(tmatch == templateMatch.end()) {
-                    templateMatch.insert(std::pair<const LSHashEntry*, int>(&(*hit), hit->count));
-                } else {
-                    tmatch->second += hit->count;
+                const std::pair<T, LSHashEntry> &he = *hit;
+                if(norm(he.first-arg) < 0.1) {
+                    std::pair<const T*, const LSHashEntry*> entry(NULL, NULL);
+                    ret.push_back( entry );
+                    std::pair<const T*, const LSHashEntry*> & entryRef = ret.back();
+                    entryRef.first = &he.first;
+                    entryRef.second = &he.second;
                 }
             }
         }
@@ -215,7 +228,7 @@ struct LocalitySensitiveHash {
         for(auto hashTableValIt = hashTable.begin(); hashTableValIt != hashTable.end(); ++hashTableValIt ) {
             int n2 = 0;
             for(auto hoit = hashTableValIt->data.begin(); hoit!= hashTableValIt->data.end(); ++hoit ) {
-                n2 += hoit->count;
+                n2 += hoit->second.count;
             }
             n2 /= 10;
             auto histIt = histogram.find(n2);
@@ -242,7 +255,7 @@ struct LocalitySensitiveHash {
     int count() {
         int nEntries = 0;
         for(int i=0; i < hashTable.size(); ++i) {
-            const HashTableValue<LSHashEntry> &htValue = hashTable[i];
+            const HashTableValue< T, LSHashEntry> &htValue = hashTable[i];
             nEntries += htValue.data.size();
         }
         return nEntries;
@@ -252,21 +265,24 @@ struct LocalitySensitiveHash {
         assert(fs.isOpened());
         fs << "{";
         fs << "description" << "geometric hash";
-        fs << "numBuckets" << numBuckets;
+        fs << "numFields" << numFields;
         fs << "minRange" << minRange;
         fs << "maxRange" << maxRange;
         fs << "windowSize" << w;
         fs << "numEntries" << numEntries;
         fs << "data" << "[";
         for(int i=0; i < hashTable.size(); ++i) {
-            const HashTableValue<LSHashEntry> &htValue = hashTable[i];
+            const HashTableValue<T, LSHashEntry> &htValue = hashTable[i];
             if (htValue.data.size() > 0) {
                 fs << "{";
                 fs << "index" << i;
                 fs << "tableEntries" << "[";
                 for(int j=0; j < htValue.data.size(); ++j) {
-                    const LSHashEntry &he = htValue.data[j];
-                    fs << he;
+                    const std::pair<T, LSHashEntry> &entry = htValue.data[i];
+                    fs << "{";
+                    fs << "hashArg" << entry.first;
+                    fs << "data" << entry.second;
+                    fs << "}";
                 }
                 fs << "]";
                 fs << "}";
@@ -280,7 +296,7 @@ struct LocalitySensitiveHash {
     void unSerialize(const cv::FileNode  &fn) {
         
         const std::string description( (std::string)fn["description"]);
-        int nBuckets_2 = (int)fn["numBuckets"];
+        int nFields_2 = (int)fn["numFields"];
         K minRange = (K)fn["minRange"];
         K maxRange = (K)fn["maxRange"];
         int numEntriesReported = (int)fn["numEntries"];
@@ -311,10 +327,14 @@ struct LocalitySensitiveHash {
          
             
             for (; it_2 != it_2_end; ++it_2) {
-                LSHashEntry he;
-                (*it_2) >> he;
-                hashTable[index].data.push_back(he);
-                stats(he);
+                const cv::FileNode & thisEntry = *it_2;
+                std::pair<T, LSHashEntry> entry;
+                hashTable[index].data.push_back(entry);
+                std::pair<T, LSHashEntry> &entryRef = hashTable[index].data.back();
+                thisEntry["hashArg"] >> entryRef.first;
+                thisEntry["data"] >> entryRef.second;
+
+                stats(entryRef.second);
                 ++numEntries;
             }
         }
@@ -332,34 +352,36 @@ struct LocalitySensitiveHash {
         assert(maxRange_arg > minRange_arg);
         maxRange = maxRange_arg;
         minRange = minRange_arg;
-        nSizePerBucket = ceil((maxRange - minRange)/w);
+        nSizePerField = ceil((maxRange - minRange)/w);
 
-        assert(nSizePerBucket > 1);
+        assert(nSizePerField > 1);
 
         oneByW = one / w;
-        nSizeAllBuckets = nSizePerBucket*nSizePerBucket*nSizePerBucket;
+        nSizeAllFields = nSizePerField*nSizePerField*nSizePerField;
         gen = std::mt19937(42);
         udist = std::uniform_real_distribution<K>(zero, w);
-        hashTable.resize(nSizeAllBuckets);
+        hashTable.resize(nSizeAllFields);
         for(int i=0; i < numBuckets; ++i) {
-            a[i] = TTraits::gen(ndist, gen);
-            b[i] = udist(gen);
+            for(int j=0; j < numFields; ++j) {
+                a[i][j] = TTraits::gen(ndist, gen);
+                b[i][j] = udist(gen);
+            }
         }
      }
     public:
     std::normal_distribution<> ndist;
     std::uniform_real_distribution<K> udist;
     std::mt19937 gen;
-    T a[numBuckets];
-    K b[numBuckets];
+    T a[numBuckets][numFields];
+    K b[numBuckets][numFields];
     K w;
     K oneByW;
     K minRange;
     K maxRange;
-    int tempStorage[numBuckets];
-    int nSizePerBucket;
-    int nSizeAllBuckets;
-    std::deque<HashTableValue< LSHashEntry > > hashTable;
+    int tempStorage[numBuckets][numFields];
+    int nSizePerField;
+    int nSizeAllFields;
+    std::deque<HashTableValue< T,  LSHashEntry > > hashTable;
     int numEntries;
 };
 
