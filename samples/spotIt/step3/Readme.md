@@ -2,6 +2,8 @@
 
 ## Feature detection challenge from [Silicon-Valley-Computer-Vision-Meetup](http://www.meetup.com/Silicon-Valley-Computer-Vision)
 
+This implementation is kind of very experimental. I am trying out with various algorithms out there.
+
 
 *
 4/2/2014
