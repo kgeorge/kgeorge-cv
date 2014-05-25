@@ -47,8 +47,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <functional>
 
 
+#include "kgCommonTraits.hpp"
 #include "kgUtils.hpp"
-#include "kgKernel.hpp"
 #include <Eigen/Core>
 #include <Eigen/Dense>
 

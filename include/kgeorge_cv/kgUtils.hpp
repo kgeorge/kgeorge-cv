@@ -44,6 +44,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <unordered_set>
 #include <set>
 #include <string>
+#include <sstream>
+
+
+#include "kgKernel.hpp"
 
 
 #if defined(DEBUG)
@@ -55,6 +59,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define KG_DBGOUT( x )
 
 #endif
+
 
 namespace Kg {
     
@@ -80,27 +85,128 @@ namespace Kg {
     //and keeps track of current, mean, variance and numSamples
     struct StatsMaker {
         float mean;
-        int n;
+        int nSamples;
         float variance;
+        float minVal, maxVal;
         StatsMaker(const std::string &name):name(name) {
-            mean = 0.0f, variance = 0.0f, n=0;
+            mean = 0.0f, variance = 0.0f, nSamples=0;
+            minVal=std::numeric_limits<float>::max();
+            maxVal=-std::numeric_limits<float>::max();
         }
         void addSample( float sample ) {
-            float reciprocal = 1.0f /(n + 1);
-            float newMean = (mean * n + sample) * reciprocal;
-            float sumSq = (variance +  mean * mean) * n + sample * sample;
+            float reciprocal = 1.0f /(nSamples + 1);
+            float newMean = (mean * nSamples + sample) * reciprocal;
+            float sumSq = (variance +  mean * mean) * nSamples + sample * sample;
+            minVal = (sample < minVal) ? sample : minVal;
+            maxVal = (sample > maxVal) ? sample : maxVal;
             variance = sumSq * reciprocal - (newMean * newMean);
             mean = newMean;
-            n +=1;
+            nSamples +=1;
         }
         std::string name;
-        
+
+        void describe_(std::string &desc) const {
+            std::stringstream ss;
+            ss << name << ": mu=" << mean << ": variance=" << variance;
+            ss << ": minVal=" << minVal <<": maxVal=" << maxVal << std::endl;
+            desc = ss.str();
+        }
+
         friend std::ostream &operator<< (std::ostream &o, const StatsMaker &s) {
-            o << s.name << ": mu=" << s.mean << ": variance=" << s.variance <<  std::endl;
+            std::string desc;
+            s.describe_(desc);
+            o << desc;
             return o;
             
         }
     };
+
+
+
+    template<typename T>
+    struct Point2 {
+        T r_;
+        T c_;
+        Point2():r_(0),c_(0){}
+        Point2(T r, T c):r_(r),c_(c){}
+        T get_r()const { return r_;}
+        T get_c()const {return c_;}
+        void set_r(T r){ r_ = r;}
+        void set_c(T c){ c_ = c;}
+    };
+
+    typedef Point2<int> Point2i;
+    typedef Point2<float> Point2f;
+
+    template<typename T, typename C>
+    struct Histogram1 {
+        typedef C CountType;
+        typedef T ValueType;
+        typedef typename AppropriateNonIntegralType<T>::value_type R;
+        typedef std::vector<C> THist;
+        Histogram1(int nBins, T minSample, T maxSample):
+            nSamples(0),
+            nBins(nBins),
+            minSample(minSample),
+            maxSample(maxSample){
+            assert(maxSample > minSample);
+            binWidth_ = static_cast<R>(maxSample - minSample)/nBins;
+            hist.assign(nBins, static_cast<C>(0));
+        }
+        virtual ~Histogram1(){
+            hist.clear();
+        }
+
+
+
+        virtual void addSample(T sample) {
+            assert(sample <= maxSample);
+            assert(sample >= minSample);
+
+            int whichBin = floor(static_cast<R>(sample - minSample)/binWidth_);
+            if(whichBin >= nBins) {
+                assert(sample == maxSample);
+                whichBin -=1;
+            }
+            hist[whichBin] += static_cast<C>(1);
+            nSamples++;
+        }
+
+        void describe( std::string &desc) const {
+            std::stringstream ss;
+            ss << "[ ";
+            T leftLimit, rightLimit;
+
+            for(int i=0; i < nBins; ++i ) {
+                leftLimit = minSample + i * binWidth_;
+                rightLimit = minSample + (i +1) * binWidth_;
+                ss << i << ":" << leftLimit << "<=" << hist[i] << "<" << rightLimit;
+                ss << ",  ";
+                if (i > 0 && i %9 ==0) {
+                    ss << std::endl;
+                }
+            }
+            ss << " ]";
+            desc = ss.str();
+        }
+
+        R binRepresentative(int whichBin) {
+            assert(whichBin < nBins);
+            return (minSample + static_cast<R>(whichBin + 0.5) * binWidth_);
+        }
+
+        THist &get_hist(){ return hist;}
+
+
+        THist hist;
+        int nBins;
+        T minSample;
+        T maxSample;
+        T binWidth_;
+        int nSamples;
+    };
+
+    typedef Histogram1<float, int> Histogram1fi;
 
     template<int i, int n> struct Pow{
         enum { value = i * Pow<i, n-1>::value};

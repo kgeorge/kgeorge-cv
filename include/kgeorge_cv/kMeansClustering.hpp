@@ -44,6 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <functional>
 #include <set>
 
+
 #include "kgUtils.hpp"
 #include "kMeansClustering_detail.hpp"
 

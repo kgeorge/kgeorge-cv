@@ -5,7 +5,7 @@
 
 #include "kgeorge_cv/kgLocalitySensitiveHash.hpp"
 #include "kgeorge_cv/kgUtils.hpp"
-#include "kgeorge_cv/kgKernel.hpp"
+#include "kgeorge_cv/kgCommonTraits.hpp"
 
 
 using namespace std;

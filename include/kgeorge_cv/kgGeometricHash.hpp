@@ -52,8 +52,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
+#include "kgCommonTraits.hpp"
 #include "kgUtils.hpp"
-#include "kgKernel.hpp"
 #include "kgLocalitySensitiveHash.hpp"
 #include "kgLeastSquaresTransform.hpp"
 

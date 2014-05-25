@@ -46,8 +46,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <functional>
 
 
+#include "kgCommonTraits.hpp"
 #include "kgUtils.hpp"
-#include "kgKernel.hpp"
 
 
 template< typename T, typename LSHashEntry>
@@ -78,7 +78,6 @@ struct LocalitySensitiveHash {
     typedef typename AppropriateNonIntegralType<I>::value_type K;
     static constexpr K zero = static_cast<K>(0);
     static constexpr K one = static_cast<K>(1);
-    static constexpr int numQueryIndices = Kg::Pow<3, numFields>::value;
     LocalitySensitiveHash(K w, K minRange, K maxRange):
         w(w),
         minRange(minRange),
@@ -86,7 +85,7 @@ struct LocalitySensitiveHash {
         oneByW(one/w),
         gen(42),
         ndist(std::normal_distribution<>(zero, one)) {
-        resize(w, minRange, maxRange);
+        resize_(w, minRange, maxRange);
     }
     LocalitySensitiveHash():
         w(1),
@@ -95,7 +94,7 @@ struct LocalitySensitiveHash {
         minRange(-1),
         maxRange(1),
         ndist(std::normal_distribution<>(zero, one)) {
-        resize(w, minRange, maxRange);
+        resize_(w, minRange, maxRange);
     }
 
     int findIndex( int ret[numBuckets][numFields], int iBucket) {
@@ -134,7 +133,7 @@ struct LocalitySensitiveHash {
     }
 
 
-    void computeHashTableIndexCoreQ(const T &arg, std::vector<int> &retVal ) {
+    void computeHashTableIndexCoreQ(const T &arg, std::vector< std::pair<int, int> > &retVal ) {
         K temp;
        int tempStorage2[numBuckets][numFields];
         K numSizeBy2 = nSizePerField/2;
@@ -147,11 +146,9 @@ struct LocalitySensitiveHash {
                 tempStorage[i][j] += numSizeBy2;
                 assert(tempStorage[i][j] > 0);
             }
-        }
-        for(int i=0; i < numBuckets; ++i) {
             int hashTableIndex = findIndex(tempStorage, i);
-            assert(hashTableIndex < hashTable.size());
-            retVal.push_back(hashTableIndex);
+            assert(hashTableIndex < hashTable[i].size());
+            retVal.push_back(std::pair<int, int>(i, hashTableIndex));
         }
     }
 
@@ -159,7 +156,7 @@ struct LocalitySensitiveHash {
     void insertHashEntryCore( const T &arg, const LSHashEntry &entry, int hashTableIndices[numBuckets] ) {
         for(int i=0; i < numBuckets; ++i) {
             int hIndex = hashTableIndices[i];
-            HashTableValue<T, LSHashEntry> &hashTableVal = hashTable[hIndex];
+            HashTableValue<T, LSHashEntry> &hashTableVal = hashTable[i][hIndex];
             auto hit = hashTableVal.data.begin();
             int numEntriesOfSameValue =0;
             bool found = false;
@@ -200,14 +197,13 @@ struct LocalitySensitiveHash {
     //std::map<const LSHashEntry *, int, std::less<LSHashEntry*> >
     //void query( const T &arg,  const LSHashEntry & entry, std::map<const LSHashEntry*, int> &templateMatch) {
     void query( const T &arg, std::deque< std::pair<const T*, const LSHashEntry*> > &ret) {
-        std::vector<int> neighboringIndices;
-        neighboringIndices.reserve(2* numBuckets);
-        computeHashTableIndexCoreQ(arg, neighboringIndices);
+        int queryResults[numBuckets];
+        computeHashTableIndexCore(arg, queryResults);
         //int hashTableIndex =  computeHashTableIndexCore(arg);
-        for(int i=0; i < neighboringIndices.size(); ++i) {
-            int hashTableIndex = neighboringIndices[i];
-            assert(hashTableIndex < hashTable.size());
-            HashTableValue<T, LSHashEntry> &hashTableVal = hashTable[hashTableIndex];
+        for(int i=0; i < numBuckets; ++i) {
+            int hashTableIndex = queryResults[i];
+            assert(hashTableIndex < hashTable[i].size());
+            HashTableValue<T, LSHashEntry> &hashTableVal = hashTable[i][hashTableIndex];
             auto hit = hashTableVal.data.begin();
             for(hit = hashTableVal.data.begin(); hit != hashTableVal.data.end(); ++hit) {
                 const std::pair<T, LSHashEntry> &he = *hit;
@@ -224,6 +220,7 @@ struct LocalitySensitiveHash {
     
     
     void stats() const {
+#if 0
         std::map<int, int> histogram;
         for(auto hashTableValIt = hashTable.begin(); hashTableValIt != hashTable.end(); ++hashTableValIt ) {
             int n2 = 0;
@@ -242,11 +239,14 @@ struct LocalitySensitiveHash {
         for(auto mit = histogram.begin(); mit != histogram.end(); ++mit) {
             std::cout << mit->first << ", " << mit->second << std::endl;
         }
+#endif
     }
 
     void clear() {
-        for(auto hit = hashTable.begin(); hit != hashTable.end(); ++hit ) {
-            hit->clear();
+        for(int i=0; i < numBuckets; ++i) {
+            for(auto hit = hashTable[i].begin(); hit != hashTable[i].end(); ++hit ) {
+                hit->clear();
+            }
         }
         numEntries=0;
     }
@@ -254,13 +254,15 @@ struct LocalitySensitiveHash {
 
     int count() {
         int nEntries = 0;
-        for(int i=0; i < hashTable.size(); ++i) {
-            const HashTableValue< T, LSHashEntry> &htValue = hashTable[i];
-            nEntries += htValue.data.size();
+        for(int i=0; i < numBuckets; ++i) {
+            for(int j=0; j < hashTable.size(); ++j) {
+                const HashTableValue< T, LSHashEntry> &htValue = hashTable[i][j];
+                nEntries += htValue.data.size();
+            }
         }
         return nEntries;
-
     }
+
     void serialize(cv::FileStorage &fs) const{
         assert(fs.isOpened());
         fs << "{";
@@ -271,24 +273,30 @@ struct LocalitySensitiveHash {
         fs << "windowSize" << w;
         fs << "numEntries" << numEntries;
         fs << "data" << "[";
-        for(int i=0; i < hashTable.size(); ++i) {
-            const HashTableValue<T, LSHashEntry> &htValue = hashTable[i];
-            if (htValue.data.size() > 0) {
-                fs << "{";
-                fs << "index" << i;
-                fs << "tableEntries" << "[";
-                for(int j=0; j < htValue.data.size(); ++j) {
-                    const std::pair<T, LSHashEntry> &entry = htValue.data[i];
+        fs << "{";
+        for(int i=0; i < numBuckets; ++i) {
+        fs << "[";
+            for(int j=0; j < hashTable[i].size(); ++j)  {
+                const HashTableValue<T, LSHashEntry> &htValue = hashTable[i][j];
+                if (htValue.data.size() > 0) {
                     fs << "{";
-                    fs << "hashArg" << entry.first;
-                    fs << "data" << entry.second;
+                    fs << "index" << i;
+                    fs << "tableEntries" << "[";
+                    for(int j=0; j < htValue.data.size(); ++j) {
+                        const std::pair<T, LSHashEntry> &entry = htValue.data[i];
+                        fs << "{";
+                        fs << "hashArg" << entry.first;
+                        fs << "data" << entry.second;
+                        fs << "}";
+                    }
+                    fs << "]";
                     fs << "}";
-                }
-                fs << "]";
-                fs << "}";
 
+                }
             }
         }
+        fs << "]";
+        fs << "}";
         fs << "]";
         fs << "}";
     }
@@ -301,7 +309,7 @@ struct LocalitySensitiveHash {
         K maxRange = (K)fn["maxRange"];
         int numEntriesReported = (int)fn["numEntries"];
         K w = (K)fn["windowSize"];
-        resize(w, minRange, maxRange);
+        resize_(w, minRange, maxRange);
         StatsForLSHashEntry<LSHashEntry> stats;
         
         cv::FileNode data = fn["data"];                         // Read string sequence - Get node
@@ -312,30 +320,44 @@ struct LocalitySensitiveHash {
         }
         
         cv::FileNodeIterator it = data.begin(), it_end = data.end(); // Go through the node
-
-        for (; it != it_end; ++it) {
-            const cv::FileNode &thisNode = *it;
-            int index = (int) thisNode["index"];
-            const cv::FileNode &tableEntries = thisNode["tableEntries"];
-            if (tableEntries.type() != cv::FileNode::SEQ)
+        int whichHashTable=0;
+        for (; it != it_end; ++it, ++whichHashTable) {
+            const cv::FileNode &thisTable = *it;
+            if (thisTable.type() != cv::FileNode::SEQ)
             {
-                std::cerr << "tableEntries is not a sequence! FAIL" << std::endl;
-                throw std::runtime_error("tableEntries is not a sequence! FAIL");
+                std::cerr << "data is not a sequence! FAIL" << std::endl;
+                throw std::runtime_error("data is not a sequence! FAIL");
             }
 
-            cv::FileNodeIterator it_2 = tableEntries.begin(), it_2_end = tableEntries.end(); // Go through the node
+            cv::FileNodeIterator it_2 = thisTable.begin(), it_2_end = thisTable.end(); // Go through the node
+            for(; it_2 != it_2_end; ++it_2) {
+
+                const cv::FileNode &thisNode = *it_2;
+
+
+
+                int index = (int) thisNode["index"];
+                const cv::FileNode &tableEntries = thisNode["tableEntries"];
+                if (tableEntries.type() != cv::FileNode::SEQ)
+                {
+                    std::cerr << "tableEntries is not a sequence! FAIL" << std::endl;
+                    throw std::runtime_error("tableEntries is not a sequence! FAIL");
+                }
+
+                cv::FileNodeIterator it_3 = tableEntries.begin(), it_3_end = tableEntries.end(); // Go through the node
          
             
-            for (; it_2 != it_2_end; ++it_2) {
-                const cv::FileNode & thisEntry = *it_2;
-                std::pair<T, LSHashEntry> entry;
-                hashTable[index].data.push_back(entry);
-                std::pair<T, LSHashEntry> &entryRef = hashTable[index].data.back();
-                thisEntry["hashArg"] >> entryRef.first;
-                thisEntry["data"] >> entryRef.second;
+                for (; it_3 != it_3_end; ++it_3) {
+                    const cv::FileNode & thisEntry = *it_3;
+                    std::pair<T, LSHashEntry> entry;
+                    hashTable[whichHashTable][index].data.push_back(entry);
+                    std::pair<T, LSHashEntry> &entryRef = hashTable[whichHashTable][index].data.back();
+                    thisEntry["hashArg"] >> entryRef.first;
+                    thisEntry["data"] >> entryRef.second;
 
-                stats(entryRef.second);
-                ++numEntries;
+                    stats(entryRef.second);
+                    ++numEntries;
+                }
             }
         }
         assert(numEntriesReported == numEntries);
@@ -343,7 +365,7 @@ struct LocalitySensitiveHash {
     }
 
     protected:
-     void resize( K w_arg, K minRange_arg, K maxRange_arg ) {
+     void resize_( K w_arg, K minRange_arg, K maxRange_arg ) {
 
         clear();
         assert( minRange_arg == -(maxRange_arg)); //right now this has to be likethis
@@ -360,8 +382,8 @@ struct LocalitySensitiveHash {
         nSizeAllFields = nSizePerField*nSizePerField*nSizePerField;
         gen = std::mt19937(42);
         udist = std::uniform_real_distribution<K>(zero, w);
-        hashTable.resize(nSizeAllFields);
-        for(int i=0; i < numBuckets; ++i) {
+        for(int i=0;   i < numBuckets; ++i) {
+            hashTable[i].resize(nSizeAllFields);
             for(int j=0; j < numFields; ++j) {
                 a[i][j] = TTraits::gen(ndist, gen);
                 b[i][j] = udist(gen);
@@ -381,7 +403,7 @@ struct LocalitySensitiveHash {
     int tempStorage[numBuckets][numFields];
     int nSizePerField;
     int nSizeAllFields;
-    std::deque<HashTableValue< T,  LSHashEntry > > hashTable;
+    std::deque<HashTableValue< T,  LSHashEntry > > hashTable[ numBuckets ];
     int numEntries;
 };
 
