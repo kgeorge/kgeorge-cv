@@ -1,0 +1,9 @@
+to compile 32 bit opencv
+cmake -G "Unix Makefiles" -D CMAKE_OSX_ARCHITECTURES=i386 -D CMAKE_C_FLAGS=-m32 -D CMAKE_CXX_FLAGS=-m32 ..
+
+
+-D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=/usr/local -D BUILD_NEW_PYTHON_SUPPORT=ON -D BUILD_EXAMPLES=ON
+
+
+cmake -DCMAKE_CXX_COMPILER="clang++" -DCMAKE_CXX_FLAGS="-std=c++11 -stdlib=libc++ -U__STRICT_ANSI__"  ../source
+
