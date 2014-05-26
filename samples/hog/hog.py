@@ -5,6 +5,8 @@ import fnmatch
 import re
 import cv2, cv
 import hogc
+import math
+import time
 
 
 
@@ -13,18 +15,23 @@ r2 =  re.compile(r'^\s*(?P<left>\d+)\s*,\s*(?P<top>\d+)\s*,\s*(?P<width>\d+)\s*,
 #r2 =  re.compile(r'^\s*(?P<left>\d+)\s*')
 
 def processImage(dirname, filename, smAngle, smMag):
+    stime = time.time()
     (n,e) = os.path.splitext(filename)
     img = cv2.imread(os.path.join(dirname, filename),3)
     convertedImg = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     h = convertedImg.shape[0]
     w = convertedImg.shape[1]
-    hogScheme = hogc.HogScheme(w, h)
-    hogc.hog(convertedImg, hogScheme, 1, 2, smAngle, smMag)
-    cv2.imwrite( os.path.join(dirname, n+'_delme' + e),convertedImg)
-    narray = nu.asarray(img)
-    #for i in dir(cv2):
-    #    print i
-    print narray.dtype.name, narray.shape, narray.size, narray.itemsize, narray.ndim, narray.nbytes
+    hogScheme = hogc.HogScheme(w,h)
+    descriptor = []
+    hog = hogc.Hog(hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.YesGaussian)
+    for r in range(0, hogScheme.numBlocksVertical):
+        for c in range(0, hogScheme.numBlocksHorizontal):
+            aHist = hogc.AngleHistogram(9, 0.0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+            hog.computeBlock(convertedImg, r, c, smAngle, smMag, aHist, False)
+            descriptor.append(aHist.hist())
+            pass
+    etime = time.time()
+    print "%s, took %d millisecs, descriptor %r" % (filename, ((etime - stime) * 1000), descriptor[0])
     pass
 
 

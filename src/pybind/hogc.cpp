@@ -88,7 +88,6 @@ struct GaussianSpatialWeightForBlock {
 
 
     float weight(int r, int c) {
-
         assert(r < blockHeight);
         assert(c < blockWidth);
         //for blockHeight == 8,
@@ -99,6 +98,7 @@ struct GaussianSpatialWeightForBlock {
         c += (c < 0) ? 1:0;
         //corresponding to input, r =0,1,2,34,5,6,7,
         //r at  this pointe varies as -3,-2,-1,0,0,1,2,3
+
         assert(r < blockHeight/2);
         assert(c < blockWidth/2);
 
@@ -155,11 +155,13 @@ struct AngleHistogram: public Histogram1ff {
 
     void addSample(float sample, float magnitude) {
         assert(eInterpolationPolicy == AngleHistogram::eYesInterpolation);
-        assert(sample <= maxSample);
-        assert(sample >= minSample);
+
+        assert(sample < maxSample || ep(sample, maxSample));
+        assert(sample > minSample || ep(sample, minSample));
+        sample = Kg::clamp(sample, minSample, maxSample);
         int whichBin = floor(static_cast<R>(sample - minSample)/binWidth_);
         if(whichBin >= nBins) {
-            assert(sample == maxSample);
+            assert(ep(sample,maxSample));
             whichBin -=1;
         }
         float binRep = binRepresentative(whichBin);
@@ -183,6 +185,7 @@ struct AngleHistogram: public Histogram1ff {
         hist[whichBin] += contributionToBin;
         nSamples++;
     }
+    EpsilonEq<float> ep;
     EContributionPolicy eContributionPolicy;
     EInterpolationPolicy eInterpolationPolicy;
 
@@ -205,9 +208,9 @@ std::string describeStatsMaker( const Kg::StatsMaker & sm) {
 //since I haven't fuond a  way to write boost=python method where std::string
 //can e passed as a reference
 template <typename H>
-std::string describeHistogram( const H & hist) {
+std::string describeHistogram( const H & hist, bool bVerbose) {
     std::string desc;
-    hist.describe(desc);
+    hist.describe(desc, bVerbose);
     return desc;
 }
 
@@ -285,9 +288,7 @@ void computeAngleAndMagnitudeSigned( const Kg::Point2f & gradiant, AngleAndMagni
     } else if (gradiant.c_ == 0 && gradiant.r_ < 0) {
         angle += 2*M_PI;
     }
-    if(angle < 0) {
-        std::cout << "c: " << gradiant.c_ << "r: " << gradiant.r_ << "angle: " << angle << std::endl;
-    }
+    assert(angle >= 0);
     am.set_a(angle);
     am.set_m(sqrt(gradiant.c_*gradiant.c_ + gradiant.r_ * gradiant.r_));
 }
@@ -302,7 +303,7 @@ void computeAngleAndMagnitudeUnSigned( const Kg::Point2f & gradiant, AngleAndMag
     angle = angle + M_PI/2.0;
     EpsilonEq<float> ep;
     if(!(((angle > 0) || ep(angle, 0)) && ((angle < M_PI) || ep(angle, M_PI)))) {
-        std::cout << "angle: " << angle << std::endl;
+        //std::cout << "angle: " << angle << std::endl;
         assert(false);
     }
     am.set_a(angle);
@@ -345,7 +346,9 @@ struct Hog {
                     (imgData(r,c+1) - imgData(r,c-1)) * 0.5
                 );
                 AngleAndMagnitude am;
-                computeCore_(p, r, c, am);
+                int rOffset = r - topLeft.r_;
+                int cOffset = c - topLeft.c_;
+                computeCore_(p, rOffset, cOffset, am);
                 if( debug) {
                     std::cout << "~~~~~~~~~~~~r,c:" << r << "," << c << ", angle:" << am.get_a() << ", mag: " << am.get_m() << std::endl;
                 }
@@ -355,7 +358,6 @@ struct Hog {
 
             }
         }
-        std::cout << std::endl;
     }
 
 
@@ -423,7 +425,7 @@ BOOST_PYTHON_MODULE(hogc) {
 	    .def("hist", &Kg::Histogram1fi::get_hist, bp::return_value_policy<bp::return_by_value>())
 	    .def("addSample",  &Kg::Histogram1fi::addSample)
     ;
-    bp::def("describeHistogram1f", &describeHistogram<Kg::Histogram1fi>);
+    bp::def("describeHistogram1fi", &describeHistogram<Kg::Histogram1fi>, bp::args("hist", "verbose"));
 
 
 
@@ -439,7 +441,7 @@ BOOST_PYTHON_MODULE(hogc) {
 	    .def("hist", &Histogram1ff::get_hist, bp::return_value_policy<bp::return_by_value>())
 	    .def("addSample",  &Histogram1ff::addSample)
     ;
-    bp::def("describeHistogram1f", &describeHistogram<Histogram1ff>);
+    bp::def("describeHistogram1ff", &describeHistogram<Histogram1ff>, bp::args("hist", "verbose"));
 
     {
         bp::scope inAngleHistogram =

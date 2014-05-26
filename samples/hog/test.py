@@ -262,25 +262,24 @@ class TestHog(unittest.TestCase):
         #Put (0,0) cell = 64, (1,0) cell = 64, (0,1) cell = 128, (1,1) cell= 128
         # this should give 14 *2 elements with a horizontal gradient
         # so  0 bin in the angle should get contribution from the 28 samples
-        r=0
-        c=0
+        r=1
+        c=1
+        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
+        r=2
+        c=1
         self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
         r=1
-        c=0
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
-        r=0
-        c=1
+        c=2
         self.grayImg[r*8:r*8+8,c*8:c*8+8] = 128
-        r=1
-        c=1
+        r=2
+        c=2
         self.grayImg[r*8:r*8+8,c*8:c*8+8] = 128
         smAngle = hogc.StatsMaker("angle")
         smMag = hogc.StatsMaker("magnitude")
         aHist = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
         hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
-        hog.computeBlock( self.grayImg, 0, 0, smAngle, smMag, aHist, False)
+        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
         hist = aHist.hist()
-        #print "block horosoztal hist", hogc.describeHistogram1f(aHist)
         self.assertEqual( hist[4], 28)
         for i in range(0,9):
             if i == 4:
@@ -289,7 +288,7 @@ class TestHog(unittest.TestCase):
 
         aHist = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
         hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
-        hog.computeBlock( self.grayImg, 0, 0, smAngle, smMag, aHist, False)
+        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
         hist = aHist.hist()
         self.assertEqual( hist[4], 28 * (128 - 64)*0.5)
         for i in range(0,9):
@@ -305,39 +304,39 @@ class TestHog(unittest.TestCase):
         #Put (0,0) cell = 64, (1,0) cell = 128, (0,1) cell = 128, (1,1) cell= 128
         # this should give 14 *2 elements with a horizontal gradient
         # so  0 bin in the angle should get contribution from the 28 samples
-        r=0
-        c=0
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
         r=1
-        c=0
+        c=1
+        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
+        r=2
+        c=1
         self.grayImg[r*8:r*8+8,c*8:c*8+8] = 128
-        r=0
-        c=1
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
         r=1
-        c=1
+        c=2
+        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
+        r=2
+        c=2
         self.grayImg[r*8:r*8+8,c*8:c*8+8] = 128
         smAngle = hogc.StatsMaker("angle")
         smMag = hogc.StatsMaker("magnitude")
         aHist = hogc.AngleHistogram(9, 0.0, math.pi, hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
         hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
-        hog.computeBlock( self.grayImg, 0, 0, smAngle, smMag, aHist, False)
-        print "vertical: " , hogc.describeHistogram1f(aHist)
+        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
+        print "vertical: " , hogc.describeHistogram1ff(aHist, verbose=True)
         hist = aHist.hist()
         self.assertTrue( almostEqual(hist[8], 28))
         for i in range(0,8):
             self.assertEqual(hist[i], 0)
         aHist = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
         hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
-        hog.computeBlock( self.grayImg, 0, 0, smAngle, smMag, aHist, False)
+        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
         hist = aHist.hist()
-        #print "test_computeBlockVertical", hogc.describeHistogram1f(aHist)
+        #print "test_computeBlockVertical", hogc.describeHistogram1ff(aHist, verbose=True)
         self.assertTrue(almostEqual(hist[8], 28 * (128 - 64)*0.5))
         for i in range(0,8):
             self.assertEqual(hist[i], 0)
         aHist = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
         hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.YesGaussian)
-        hog.computeBlock( self.grayImg, 0, 0, smAngle, smMag, aHist, False)
+        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
         gwb = hogc.GaussianSpatialWeightForBlock(16, 8)
         totalWeight = 0
         for r in range(1, 15):
@@ -398,15 +397,24 @@ class TestHistogram1fi(unittest.TestCase):
             self.assertEqual(histData[i], 0)
         self.assertEqual(histData[hist.nBins-1], 1)
         histData[3] = 10
-        desc =  hogc.describeHistogram1f(hist)
+        desc =  hogc.describeHistogram1fi(hist, verbose=True)
         print "histogra, desc: ", desc
         pass
 
     def test_describe(self):
+        r1 = re.compile(r'\d+[:]-?\d+[.]\d*[<][=]\d+[<]-?\d+[.]\d*')
+        r2 = re.compile(r'-?\d+[.]?(\d+)?')
         hist = hogc.Histogram1fi(9, -4.5, 4.5)
-        desc =  hogc.describeHistogram1f(hist)
-        print "histogra, desc: ", desc
+        desc =  hogc.describeHistogram1fi(hist, verbose=True)
         self.assertTrue(type(desc), type(""))
+        self.assertEqual(len(desc.split(",")[1:-1]), 9)
+        for i in desc.split(",")[1:-1]:
+            self.assertTrue(r1.match(i.strip()) != None)
+
+        desc =  hogc.describeHistogram1fi(hist, verbose=False)
+        self.assertEqual(len(desc.split(",")[:]), 9)
+        for i in desc.split(","):
+            self.assertTrue(r2.match(i.strip()) != None)
         pass
 
 class TestHistogram1ff(unittest.TestCase):
@@ -458,20 +466,29 @@ class TestHistogram1ff(unittest.TestCase):
             self.assertEqual(histData[i], 0)
         self.assertEqual(histData[hist.nBins-1], 1)
         histData[3] = 10
-        desc =  hogc.describeHistogram1f(hist)
+        desc =  hogc.describeHistogram1ff(hist, verbose=True)
         print "histogra, desc: ", desc
 
 
         pass
+
+
 
     def test_describe(self):
-        hist = hogc.Histogram1ff(9, -4.5, 4.5)
-        desc =  hogc.describeHistogram1f(hist)
-        print "histogra, desc: ", desc
+        r1 = re.compile(r'\d+[:]-?\d+[.]\d*[<][=]\d+[.]?\d*[<]-?\d+[.]\d*')
+        r2 = re.compile(r'-?\d+[.]?(\d+)?')
+        hist = hogc.Histogram1fi(9, -4.5, 4.5)
+        desc =  hogc.describeHistogram1fi(hist, verbose=True)
         self.assertTrue(type(desc), type(""))
+        self.assertEqual(len(desc.split(",")[1:-1]), 9)
+        for i in desc.split(",")[1:-1]:
+            self.assertTrue(r1.match(i.strip()) != None)
+
+        desc =  hogc.describeHistogram1fi(hist, verbose=False)
+        self.assertEqual(len(desc.split(",")[:]), 9)
+        for i in desc.split(","):
+            self.assertTrue(r2.match(i.strip()) != None)
         pass
-
-
 
 class TestGaussianSpatialWeightForBlock(unittest.TestCase):
 
@@ -629,9 +646,56 @@ class TestAngleHistogram(unittest.TestCase):
             self.assertEqual(histData[i], 0)
         pass
 
+
+    def test_addSamplesLimitingValues(self):
+        minSample =  - 4.5
+        maxSample = 4.5
+        nBins = 9
+        hist = hogc.AngleHistogram(nBins, minSample, maxSample,
+                                   hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        #add a sample below minSample, but almost equal
+        sample = minSample - 0.00000001
+        self.assertTrue(self.myAlmostEqual(sample, minSample))
+        hist.addSample(sample, 100.0)
+        nSamples = 1
+
+        histData = hist.hist()
+        self.assertTrue(self.myAlmostEqual(histData[0], 1.0))
+        #add a sample below minSample, but almost equal
+
+        sample = maxSample + 0.00000001
+        self.assertTrue(self.myAlmostEqual(sample, maxSample))
+        hist.addSample(sample, 100.0)
+        nSamples += 1
+
+        histData = hist.hist()
+        self.assertTrue(self.myAlmostEqual(histData[nBins-1], 1.0))
+
+
+        hist = hogc.AngleHistogram(nBins, minSample, maxSample,
+                                   hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        #add a sample below minSample, but almost equal
+        sample = minSample - 0.00000001
+        kMagnitude = 100.0
+        self.assertTrue(self.myAlmostEqual(sample, minSample))
+        hist.addSample(sample, kMagnitude)
+        nSamples = 1
+
+        histData = hist.hist()
+        self.assertTrue(self.myAlmostEqual(histData[0], 100.0))
+        #add a sample below minSample, but almost equal
+
+        sample = maxSample + 0.00000001
+        self.assertTrue(self.myAlmostEqual(sample, maxSample))
+        hist.addSample(sample, kMagnitude)
+        nSamples += 1
+
+        histData = hist.hist()
+        self.assertTrue(self.myAlmostEqual(histData[nBins-1], 100.0))
+
     def test_describe(self):
         hist = hogc.AngleHistogram(9, -4.5, 4.5, hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
-        desc =  hogc.describeHistogram1f(hist)
+        desc =  hogc.describeHistogram1ff(hist, verbose=True)
         print "histogra, desc: ", desc
         self.assertTrue(type(desc), type(""))
         pass
@@ -648,7 +712,7 @@ class TestAngleHistogram(unittest.TestCase):
             self.assertEqual(histData[i], 0)
         self.assertEqual(histData[hist.nBins-1], 1)
         histData[3] = 10
-        desc =  hogc.describeHistogram1f(hist)
+        desc =  hogc.describeHistogram1ff(hist, verbose=True)
         print "histogra, desc: ", desc
 
 

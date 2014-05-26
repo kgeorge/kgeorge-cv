@@ -172,21 +172,32 @@ namespace Kg {
             nSamples++;
         }
 
-        void describe( std::string &desc) const {
+        void describe( std::string &desc, bool verbose) const {
             std::stringstream ss;
-            ss << "[ ";
+            if(verbose) {
+                ss << "[,";
+            }
             T leftLimit, rightLimit;
 
             for(int i=0; i < nBins; ++i ) {
                 leftLimit = minSample + i * binWidth_;
                 rightLimit = minSample + (i +1) * binWidth_;
-                ss << i << ":" << leftLimit << "<=" << hist[i] << "<" << rightLimit;
-                ss << ",  ";
-                if (i > 0 && i %9 ==0) {
-                    ss << std::endl;
+                if(verbose) {
+                    ss << i << ":" << leftLimit << "<=" << hist[i] << "<" << rightLimit;
+                    ss << ",  ";
+                    if (i > 0 && i %9 ==0) {
+                        ss << std::endl;
+                    }
+                } else {
+                    ss << hist[i];
+                    if( i < nBins -1) {
+                        ss << ",";
+                    }
                 }
             }
-            ss << " ]";
+            if(verbose) {
+                ss << "  ]";
+            }
             desc = ss.str();
         }
 
