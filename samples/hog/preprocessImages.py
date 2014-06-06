@@ -6,6 +6,8 @@ import cv2
 import cv
 import numpy as nu
 import hogc
+import site
+import sys
 
 
 
@@ -44,6 +46,7 @@ def processImage(dirname, filename):
     if(l >=0 and t >= 0 and w >= 0 and h >= 0):
         imagefilename = os.path.join(dirname, filename)
 
+
         im2 = None
         img = cv2.imread(imagefilename)
         im2 = img[t:t+h, l:l+w]
@@ -67,21 +70,58 @@ def processImage(dirname, filename):
         hogc.gammaCorrect(numpyImg, 2.2, True)
         #print type(cvimg)
         #normalizedImg = cv2.cvtColor(numpyImg, cv2.COLOR_RGB2BGR)
-        normalizedImg = normalizeImage(numpyImg)
+        #normalizedImg = normalizeImage(numpyImg)
         #im3.save(os.path.join(builddirname, n + e))
         #im3 = None
-        cv2.imwrite((os.path.join(builddirname, n + e)), normalizedImg)
+        cv2.imwrite((os.path.join(builddirname, n + e)), numpyImg)
+        cvimg= None
+        pass
+
+def processImage2(builddir, dirname, filename):
+    if(True):
+        imagefilename = os.path.join(dirname, filename)
+        im2 = None
+        img = cv2.imread(imagefilename)
+        print filename, img.size
+        im2 = cv2.resize(img, (128, 64),  interpolation=cv2.INTER_LANCZOS4)
+        img = None
+        (n, e) = os.path.splitext(filename)
+        n += "_canonical"
+        if not os.path.exists(builddir):
+            os.mkdir(builddir)
+        numpyImg = nu.asarray(im2)
+        hogc.gammaCorrect(numpyImg, 2.2, True)
+        #normalizedImg = normalizeImage(numpyImg)
+        cv2.imwrite((os.path.join(builddir, n + e)), numpyImg)
         cvimg= None
         pass
 
 
+
 def main():
-    for root, dirs, files in os.walk("/Users/kgeorge/Dropbox/cars/good"):
+    mode = sys.argv[1]
+    print mode
+    rootdir = "/Users/kgeorge/Dropbox/cars/tentative"
+    if mode == "b":
+        rootdir = "/Users/kgeorge/Dropbox/cars/bad"
+    elif mode == "c":
+        rootdir = "/Users/kgeorge/Dropbox/cars/crossvalidate"
+
+
+    builddir = os.path.join(rootdir, "build")
+    print site.getsitepackages()
+    for root, dirs, files in os.walk(rootdir):
+        (h,t) = os.path.split(root)
+        if t.endswith('_delme'):
+            continue
         for f in files:
             (p, e) = os.path.splitext(f)
             if ((e.lower() == ".png") or (e.lower() == ".jpg") or (e.lower() == ".jpeg")) and not p.endswith("canonical"):
+                try:
 
-                processImage(root, f)
+                    processImage2(builddir, root, f)
+                except AttributeError, e:
+                    print e
                 pass
 
 if __name__ == "__main__":

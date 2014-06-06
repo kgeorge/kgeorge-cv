@@ -116,6 +116,13 @@ struct GaussianSpatialWeightForBlock {
     int blockHeightBy2_;
 };
 
+class HogException: public std::runtime_error {
+public:
+    HogException(const std::string &except):runtime_error(except){}
+
+
+};
+
 struct AngleAndMagnitude : private Kg::Point2f {
     AngleAndMagnitude(){}
     AngleAndMagnitude(float a, float m){
@@ -146,6 +153,10 @@ struct AngleHistogram: public Histogram1ff {
         Histogram1ff(nBins, minSample, maxSample),
         eContributionPolicy(eContributionPolicy),
         eInterpolationPolicy(eInterpolationPolicy)
+        {}
+    AngleHistogram( const AngleHistogram &rhs):Histogram1ff(rhs.nBins, rhs.minSample, rhs.maxSample),
+        eContributionPolicy(rhs.eContributionPolicy),
+        eInterpolationPolicy(rhs.eInterpolationPolicy)
         {}
 
     float getContribution( float magnitude ) {
@@ -212,6 +223,36 @@ std::string describeHistogram( const H & hist, bool bVerbose) {
     std::string desc;
     hist.describe(desc, bVerbose);
     return desc;
+}
+
+std::string serializeFloatVec(const std::vector<float> &floatVec) {
+    std::stringstream ss;
+    for( int i=0; i < floatVec.size(); ++i) {
+        ss << floatVec[i];
+        if(i < floatVec.size()-1) {
+            ss << ", ";
+        }
+    }
+    ss.flush();
+    return ss.str();
+}
+
+void copyToNpArray( const::std::vector<float> &floatVec, int firstIdx, np::ndarray& dest ) {
+    Py_intptr_t const *pShape =   dest.get_shape();
+    NumPyArrayData<float> floatDest(dest);
+    assert(floatVec.size() + firstIdx <= *pShape);
+    for(int i=0; i < floatVec.size(); ++i) {
+     floatDest(i+firstIdx) = floatVec[i];
+    }
+    return;
+}
+
+std::vector<float> makeTestFloatVec() {
+    std::vector<float> ret(10, 0.0);
+    for(int i=0; i < 10; ++i) {
+        ret[i] = i;
+    }
+    return ret;
 }
 
 struct HogScheme {
@@ -313,11 +354,14 @@ void computeAngleAndMagnitudeUnSigned( const Kg::Point2f & gradiant, AngleAndMag
 
 struct Hog {
     typedef enum {eYesGaussian, eNoGaussian} EBlockGaussianWeightingPolicy;
+    typedef enum {eNoNormalization, eL2Normalization} EBlockNormalizationPolicy;
     Hog(
         const HogScheme &scheme,
-        EBlockGaussianWeightingPolicy eGaussianPolicy):
+        EBlockGaussianWeightingPolicy eGaussianPolicy,
+        EBlockNormalizationPolicy eBlockNormalizationPolicy):
         scheme(scheme),
         eGaussianPolicy(eGaussianPolicy),
+        eBlockNormalizationPolicy(eBlockNormalizationPolicy),
         gaussianWeighter(GaussianSpatialWeightForBlock(scheme.numPixelsInBlockPerSide_, scheme.numPixelsInBlockPerSide_*0.5f)){
             assert(3 <=  scheme.numPixelsInBlockPerSide_);
         }
@@ -325,26 +369,24 @@ struct Hog {
         return scheme;
     }
 
-    void computeBlock(
+    void computeCell(
         np::ndarray& imgArr,
-        int r, int c,
+        int r_cell, int c_cell,
+        Kg::Point2i &topLeft,
         Kg::StatsMaker &smAngle,
         Kg::StatsMaker &smMag,
         AngleHistogram &aHist,
         bool debug =false
-    ){
-        assert(scheme.validateImage( imgArr ));
-        Kg::Point2i topLeft, botRight;
-        scheme.computeIndexLimits( r, c, topLeft, botRight );
+    ) {
 
         NumPyArrayData<unsigned char> imgData(imgArr);
-
-        for(int r=topLeft.r_ + 1; r < botRight.r_-1; ++r ){
-            for(int c=topLeft.c_ + 1; c < botRight.c_-1; ++c) {
+        for(int r = r_cell+1; r < r_cell + scheme.numPixelsInCellPerSide_ - 1; ++r) {
+            for(int c = c_cell+1; c < c_cell + scheme.numPixelsInCellPerSide_ - 1; ++c ) {
                 Kg::Point2f p = Kg::Point2f(
                     (imgData(r+1,c) - imgData(r-1,c)) * 0.5,
                     (imgData(r,c+1) - imgData(r,c-1)) * 0.5
                 );
+                //std::cout << "\t" << r << "," << c << std::endl;
                 AngleAndMagnitude am;
                 int rOffset = r - topLeft.r_;
                 int cOffset = c - topLeft.c_;
@@ -355,19 +397,68 @@ struct Hog {
                 aHist.addSample(am.get_a(), am.get_m());
                 smAngle.addSample(am.get_a());
                 smMag.addSample(am.get_m());
-
             }
         }
     }
 
-
+    void computeBlock(
+        np::ndarray& imgArr,
+        const AngleHistogram &aHistTemplate,
+        int r, int c,
+        Kg::StatsMaker &smAngle,
+        Kg::StatsMaker &smMag,
+        bool debug,
+        std::vector<float> &blockHist
+    ){
+        blockHist.reserve(scheme.numCellsInUnitPerSide_ * scheme.numCellsInUnitPerSide_ * aHistTemplate.nBins);
+        assert(scheme.validateImage( imgArr ));
+        Kg::Point2i topLeft, botRight;
+        scheme.computeIndexLimits( r, c, topLeft, botRight );
+        for(int r_cell= topLeft.r_; r_cell < botRight.r_; r_cell += scheme.numPixelsInCellPerSide_) {
+            for(int c_cell = topLeft.c_; c_cell < botRight.c_;  c_cell += scheme.numPixelsInCellPerSide_) {
+                AngleHistogram aHist(aHistTemplate);
+                computeCell(imgArr, r_cell, c_cell, topLeft, smAngle, smMag, aHist, debug);
+                AngleHistogram::THist &ahistVec = aHist.get_hist();
+                std::copy(ahistVec.begin(), ahistVec.end(), std::back_inserter(blockHist));
+            }
+        }
+        if(eBlockNormalizationPolicy == eL2Normalization) {
+            float blockSum =0.0;
+            for(int i=0; i < blockHist.size(); ++i) {
+                blockSum += blockHist[i] * blockHist[i];
+            }
+            blockSum = sqrt(blockSum);
+            EpsilonEq<float> ep;
+            if(ep(blockSum, 0) ) {
+                //std::cout << blockHist.size() << ", " << blockSum << std::endl;
+                blockSum = 2 * 1.0e-4;
+            } else  {
+                for(int i=0; i < blockHist.size(); ++i) {
+                    blockHist[i] = blockHist[i]/blockSum;
+                }
+            }
+        }
+    }
     void computeCore_(Kg::Point2f &gradient,int r, int c, AngleAndMagnitude &am) {
         computeAngleAndMagnitudeUnSigned( gradient, am);
         if(eGaussianPolicy == eYesGaussian) {
             am.set_m( am.get_m() * gaussianWeighter.weight(r,c));
         }
     }
-
+    bool validateHistogramResultForBlock(const AngleHistogram &aHistTemplate, const std::vector<float> &histVec) {
+        bool retVal = histVec.size() == aHistTemplate.nBins * scheme.numCellsInUnitPerSide_ * scheme.numCellsInUnitPerSide_;
+        if(eBlockNormalizationPolicy == eL2Normalization ) {
+            float magnitude = 0.0f;
+            for(int i=0; i < histVec.size(); ++i) {
+                magnitude += histVec[i] * histVec[i];
+            }
+            magnitude = sqrt(magnitude);
+            EpsilonEq<float> ep;
+            retVal = retVal && ep(magnitude, 1.0f);
+        }
+        return retVal;
+    }
+    EBlockNormalizationPolicy eBlockNormalizationPolicy;
     EBlockGaussianWeightingPolicy eGaussianPolicy;
     const HogScheme scheme;
     GaussianSpatialWeightForBlock gaussianWeighter;
@@ -433,6 +524,11 @@ BOOST_PYTHON_MODULE(hogc) {
         .def(bp::vector_indexing_suite<std::vector<float> >())
         ;
 
+
+
+    bp::class_<HogException>("HogException", bp::init<const std::string &>())
+        ;
+
     bp::class_<Histogram1ff>("Histogram1ff", bp::init<int, float, float>())
 	    .def_readonly("nBins", &Histogram1ff::nBins)
 	    .def_readonly("nSamples", &Histogram1ff::nSamples)
@@ -442,6 +538,9 @@ BOOST_PYTHON_MODULE(hogc) {
 	    .def("addSample",  &Histogram1ff::addSample)
     ;
     bp::def("describeHistogram1ff", &describeHistogram<Histogram1ff>, bp::args("hist", "verbose"));
+    bp::def("serializeFloatVec", &serializeFloatVec);
+    bp::def("copyToNpArray", &copyToNpArray);
+    bp::def("makeTestFloatVec", &makeTestFloatVec);
 
     {
         bp::scope inAngleHistogram =
@@ -485,16 +584,24 @@ BOOST_PYTHON_MODULE(hogc) {
     {
         bp::scope inAngleHistogram =
             bp::class_<Hog>("Hog",
-                bp::init<const HogScheme &,Hog::EBlockGaussianWeightingPolicy>())
+                bp::init<const HogScheme &,Hog::EBlockGaussianWeightingPolicy, Hog::EBlockNormalizationPolicy>())
                 .def("scheme", &Hog::get_scheme, bp::return_value_policy<bp::return_by_value>())
                 .def_readonly("gaussianPolicy", &Hog::eGaussianPolicy)
+                .def_readonly("normalizationPolicy", &Hog::eBlockNormalizationPolicy)
                 .def("computeCore", &Hog::computeCore_)
+                .def("computeCell", &Hog::computeCell)
                 .def("computeBlock", &Hog::computeBlock)
+                .def("validateHistogramResultForBlock", &Hog::validateHistogramResultForBlock)
             ;
 
             bp::enum_<Hog::EBlockGaussianWeightingPolicy>("BlockGaussianWeightingPolicy")
                 .value("YesGaussian", Hog::eYesGaussian)  //define Hog.YesGaussian
                 .value("NoGaussian",  Hog::eNoGaussian) //define Hog.NoGaussian
+            ;
+
+            bp::enum_<Hog::EBlockNormalizationPolicy>("BlockNormalizationPolicy")
+                .value("NoNormalization", Hog::eNoNormalization)  //define Hog.NoNormalization
+                .value("L2Normalization",  Hog::eL2Normalization) //define Hog.L2Normalization
             ;
 
     }

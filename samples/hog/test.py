@@ -11,7 +11,10 @@ import random, math
 
 import unittest
 
-class TestPoint2i(unittest.TestCase):
+
+almostEqual = lambda a, b: round(a -b, 4) == 0
+
+class TestMisc(unittest.TestCase):
     def setUp(self):
         pass
     def test_Point2i(self):
@@ -27,6 +30,17 @@ class TestPoint2i(unittest.TestCase):
         self.assertEqual(r.r, 31)
         self.assertEqual(r.c, 41)
         pass
+    def test_copyToNpArray(self):
+        floatVec = hogc.makeTestFloatVec()
+        npFloatVec = np.zeros((len(floatVec)+2), dtype=np.float32)
+        hogc.copyToNpArray(floatVec, 2, npFloatVec)
+        for i in range(0, len(floatVec)):
+            self.assertTrue(almostEqual(npFloatVec[i+2], floatVec[i]))
+            pass
+
+
+        pass
+
 
 
 
@@ -217,23 +231,24 @@ class TestHog(unittest.TestCase):
         pass
 
     def test_hogInit(self):
-        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.L2Normalization)
         scheme = hog.scheme()
         self.assertEqual(hog.gaussianPolicy, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
+        self.assertEqual(hog.normalizationPolicy, hogc.Hog.BlockNormalizationPolicy.L2Normalization)
         self.assertTrue(scheme ==  self.hogScheme)
         pass
 
 
     def test_hogComputeCore(self):
         almostEqual = lambda a, b: round(a -b, 4) == 0
-        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.L2Normalization)
         p3 = hogc.Point2f(-1.0, 1.0)
         am = hogc.AngleAndMagnitude()
         hog.computeCore(p3, 0, 0, am)
         print "hogComputeCore", am.a
         self.assertTrue(almostEqual(math.atan(-1.0) + math.pi/2, am.a))
         self.assertTrue(almostEqual(math.sqrt(2.0), am.m))
-        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.YesGaussian)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.YesGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
         gwb = hogc.GaussianSpatialWeightForBlock(self.hogScheme.numPixelsInBlockPerSide, self.hogScheme.numPixelsInBlockPerSide/2)
         for i in range(0,10):
             r = int(math.floor(random.random()*self.hogScheme.numPixelsInBlockPerSide))
@@ -245,108 +260,300 @@ class TestHog(unittest.TestCase):
 
 
 
-    def test_computeBlock(self):
+    def test_computeCell(self):
         smAngle = hogc.StatsMaker("angle")
         smMag = hogc.StatsMaker("magnitude")
+        blockTopLeft = hogc.Point2i(0,0)
         aHist = hogc.AngleHistogram(18, 0, 2*math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
-        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
-        hog.computeBlock( self.grayImg, 2, 3, smAngle, smMag, aHist, False)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.L2Normalization)
+        hog.computeCell( self.grayImg, 2, 3, blockTopLeft, smAngle, smMag, aHist, False)
         print "angle stats Maker", hogc.describeStatsMaker(smAngle)
         print "magnitude stats Maker", hogc.describeStatsMaker(smMag)
         pass
 
 
-    def test_computeBlockHorizontal(self):
+    def test_computeCellHorizontal(self):
         #black-en image
         self.grayImg[:,:] = 0
-        #Put (0,0) cell = 64, (1,0) cell = 64, (0,1) cell = 128, (1,1) cell= 128
-        # this should give 14 *2 elements with a horizontal gradient
-        # so  0 bin in the angle should get contribution from the 28 samples
-        r=1
-        c=1
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
-        r=2
-        c=1
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
-        r=1
-        c=2
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 128
-        r=2
-        c=2
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 128
+
+        #Take the cell whose topLeft is (8,8)
+        # Arrange data as shown below for the cell.
+        # this should give 6 *2 elements with a horizontal gradient
+        # so  4th bin in the angle should get contribution from the 12 samples
+
+        r_cellTopLeft=8
+        c_cellTopLeft=8
+        """
+          #cell 8,8
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+        """
+        self.grayImg[r_cellTopLeft:r_cellTopLeft+8,c_cellTopLeft:c_cellTopLeft+4] = 64
+        self.grayImg[r_cellTopLeft:r_cellTopLeft+8,c_cellTopLeft+4:c_cellTopLeft+8] = 128
         smAngle = hogc.StatsMaker("angle")
         smMag = hogc.StatsMaker("magnitude")
+
+        blockTopLeft = hogc.Point2i(r_cellTopLeft,c_cellTopLeft)
         aHist = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
-        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
-        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
+        hog.computeCell( self.grayImg, r_cellTopLeft, c_cellTopLeft, blockTopLeft, smAngle, smMag, aHist, False)
         hist = aHist.hist()
-        self.assertEqual( hist[4], 28)
+        self.assertEqual( hist[4], 12)
         for i in range(0,9):
             if i == 4:
                 continue
             self.assertEqual(hist[i], 0)
 
         aHist = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
-        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
-        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
+        hog.computeCell( self.grayImg, r_cellTopLeft, c_cellTopLeft, blockTopLeft,  smAngle, smMag, aHist, False)
         hist = aHist.hist()
-        self.assertEqual( hist[4], 28 * (128 - 64)*0.5)
+        self.assertEqual( hist[4], 12 * (128 - 64)*0.5)
         for i in range(0,9):
             if i ==4:
                 continue
             self.assertEqual(hist[i], 0)
-        #print "test_computeBlock", hogc.describeHistogram1f(aHist)
 
-    def test_computeBlockVertical(self):
-        almostEqual = lambda a, b: round(a -b, 3) == 0
+    def test_computeCellVertical(self):
         #black-en image
         self.grayImg[:,:] = 0
-        #Put (0,0) cell = 64, (1,0) cell = 128, (0,1) cell = 128, (1,1) cell= 128
-        # this should give 14 *2 elements with a horizontal gradient
-        # so  0 bin in the angle should get contribution from the 28 samples
-        r=1
-        c=1
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
-        r=2
-        c=1
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 128
-        r=1
-        c=2
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 64
-        r=2
-        c=2
-        self.grayImg[r*8:r*8+8,c*8:c*8+8] = 128
+        almostEqual = lambda a, b: round(a -b, 4) == 0
+
+        #Take the cell whose topLeft is (8,8)
+        # Arrange data as shown below for the cell.
+        # this should give 6 *2 elements with a horizontal gradient
+        # so  8th bin in the angle should get contribution from the 12 samples
+
+        r_cellTopLeft=8
+        c_cellTopLeft=8
+        """
+          #cell 8,8
+          64    64  64   64   64   64   64   64
+          64    64  64   64   64   64   64   64
+          64    64  64   64   64   64   64   64
+          64    64  64   64   64   64   64   64
+
+          128  128  128  128  128  128  128  128
+          128  128  128  128  128  128  128  128
+          128  128  128  128  128  128  128  128
+          128  128  128  128  128  128  128  128
+
+        """
+        blockTopLeft = hogc.Point2i(r_cellTopLeft,c_cellTopLeft)
+        self.grayImg[r_cellTopLeft:r_cellTopLeft+4,c_cellTopLeft:c_cellTopLeft+8] = 64
+        self.grayImg[r_cellTopLeft+4:r_cellTopLeft+8,c_cellTopLeft:c_cellTopLeft+8] = 128
         smAngle = hogc.StatsMaker("angle")
         smMag = hogc.StatsMaker("magnitude")
-        aHist = hogc.AngleHistogram(9, 0.0, math.pi, hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
-        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
-        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
-        print "vertical: " , hogc.describeHistogram1ff(aHist, verbose=True)
+        aHist = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
+        hog.computeCell( self.grayImg, r_cellTopLeft, c_cellTopLeft, blockTopLeft,  smAngle, smMag, aHist, False)
         hist = aHist.hist()
-        self.assertTrue( almostEqual(hist[8], 28))
-        for i in range(0,8):
+        #print "LLLLLLLLLLL~~~~~vertical: " , hogc.describeHistogram1ff(aHist, verbose=True)
+        self.assertEqual( hist[8], 12)
+        for i in range(0,9):
+            if i == 8:
+                continue
             self.assertEqual(hist[i], 0)
         aHist = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
-        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian)
-        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
+        hog.computeCell( self.grayImg, r_cellTopLeft, c_cellTopLeft, blockTopLeft, smAngle, smMag, aHist, False)
         hist = aHist.hist()
-        #print "test_computeBlockVertical", hogc.describeHistogram1ff(aHist, verbose=True)
-        self.assertTrue(almostEqual(hist[8], 28 * (128 - 64)*0.5))
-        for i in range(0,8):
+        self.assertEqual( hist[8], 12 * (128 - 64)*0.5)
+        for i in range(0,9):
+            if i ==8:
+                continue
             self.assertEqual(hist[i], 0)
-        aHist = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
-        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.YesGaussian)
-        hog.computeBlock( self.grayImg, 1, 1, smAngle, smMag, aHist, False)
-        gwb = hogc.GaussianSpatialWeightForBlock(16, 8)
-        totalWeight = 0
-        for r in range(1, 15):
-            for c in range(7,9):
-                totalWeight += gwb.weight(r,c) * (128 - 64) * 0.5
-                pass
-        binWidth = 2 * math.pi /9
-        iterpolatoinFactorRight =   (math.pi/2 - 1.5*binWidth)/binWidth
-        hist = aHist.hist()
-        self.assertTrue(almostEqual(hist[8],totalWeight))
+
+    def test_computeBlockInit(self):
+        smAngle = hogc.StatsMaker("angle")
+        smMag = hogc.StatsMaker("magnitude")
+        aHistTemplate = hogc.AngleHistogram(18, 0, 2*math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
+        histVec = hogc.FloatVec()
+        hog.computeBlock( self.grayImg, aHistTemplate, 2, 3, smAngle, smMag,False, histVec)
+        print "angle stats Maker", hogc.describeStatsMaker(smAngle)
+        print "magnitude stats Maker", hogc.describeStatsMaker(smMag)
+        pass
+
+
+
+    def test_computeBlockHorizontal(self):
+        #black-en image
+        self.grayImg[:,:] = 0
+
+        #Take the cell whose topLeft is (8,8)
+        # Arrange data as shown below for the cell.
+        # this should give 6 *2 elements with a horizontal gradient
+        # so  4th bin in the angle should get contribution from the 12 samples
+        r_blockIndex = 1
+        c_blockIndex = 1
+
+        r_cellTopLeft=8 * r_blockIndex
+        c_cellTopLeft=8 * c_blockIndex
+
+        """
+          #cell 8,8
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+          64 64 64 64 128 128 128 128
+        """
+        self.grayImg[r_cellTopLeft:r_cellTopLeft+8,c_cellTopLeft:c_cellTopLeft+4] = 64
+        self.grayImg[r_cellTopLeft:r_cellTopLeft+8,c_cellTopLeft+4:c_cellTopLeft+8] = 128
+        smAngle = hogc.StatsMaker("angle")
+        smMag = hogc.StatsMaker("magnitude")
+        aHistTemplate = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
+        histVec = hogc.FloatVec()
+        hog.computeBlock( self.grayImg, aHistTemplate, r_blockIndex, c_blockIndex, smAngle, smMag,False, histVec)
+        self.assertEqual( histVec[4], 12)
+        for i in range(0,len(histVec)):
+            if i == 4:
+                continue
+            self.assertEqual(histVec[i], 0)
+        histVec = hogc.FloatVec()
+        #print "LLLLLLLLLLL~~~~~vertical: " , hogc.describeHistogram1ff(aHist, verbose=True)
+        hog.computeBlock( self.grayImg, aHistTemplate, r_blockIndex-1, c_blockIndex, smAngle, smMag,False, histVec)
+        desc = ""
+        for i in histVec:
+            desc += ", " + str(i)
+        print " block horoz: ################## ", desc
+
+        aHistTemplate = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
+        histVec = hogc.FloatVec()
+        hog.computeBlock( self.grayImg, aHistTemplate, r_blockIndex, c_blockIndex, smAngle, smMag,False, histVec)
+        self.assertEqual( histVec[4], 12 * (128 - 64)*0.5)
+        for i in range(0,len(histVec)):
+            if i ==4:
+                continue
+            self.assertEqual(histVec[i], 0)
+
+
+    def test_computeBlockVertical(self):
+        #black-en image
+        self.grayImg[:,:] = 0
+
+        almostEqual = lambda a, b: round(a -b, 3) == 0
+        #Take the cell whose topLeft is (8,8)
+        # Arrange data as shown below for the cell.
+        # this should give 6 *2 elements with a horizontal gradient
+        # so  4th bin in the angle should get contribution from the 12 samples
+        r_blockIndex = 1
+        c_blockIndex = 1
+        r_cellTopLeft=8 * r_blockIndex
+        c_cellTopLeft=8 * c_blockIndex
+        """
+          #cell 8,8
+          64    64  64   64   64   64   64   64
+          64    64  64   64   64   64   64   64
+          64    64  64   64   64   64   64   64
+          64    64  64   64   64   64   64   64
+
+          128  128  128  128  128  128  128  128
+          128  128  128  128  128  128  128  128
+          128  128  128  128  128  128  128  128
+          128  128  128  128  128  128  128  128
+
+        """
+        self.grayImg[r_cellTopLeft:r_cellTopLeft+4,c_cellTopLeft:c_cellTopLeft+8] = 64
+        self.grayImg[r_cellTopLeft+4:r_cellTopLeft+8,c_cellTopLeft:c_cellTopLeft+8] = 128
+
+
+        r_cellTopLeft=8 * r_blockIndex + 8
+        c_cellTopLeft=8 * c_blockIndex + 8
+
+        self.grayImg[r_cellTopLeft:r_cellTopLeft+4,c_cellTopLeft:c_cellTopLeft+8] = 64
+        self.grayImg[r_cellTopLeft+4:r_cellTopLeft+8,c_cellTopLeft:c_cellTopLeft+8] = 128
+
+        smAngle = hogc.StatsMaker("angle")
+        smMag = hogc.StatsMaker("magnitude")
+        aHistTemplate = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.L2Normalization)
+        histVec = hogc.FloatVec()
+        hog.computeBlock( self.grayImg, aHistTemplate, r_blockIndex, c_blockIndex, smAngle, smMag,False, histVec)
+        oneBySqrt2 =  1.0/math.sqrt(2.0)
+        self.assertTrue( almostEqual(histVec[8],oneBySqrt2))
+        self.assertTrue( almostEqual(histVec[35],oneBySqrt2))
+        for i in range(0,len(histVec)):
+            if i == 8 or i == 35:
+                continue
+            self.assertEqual(histVec[i], 0)
+        aHistTemplate = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.L2Normalization)
+        histVec = hogc.FloatVec()
+        hog.computeBlock( self.grayImg, aHistTemplate, r_blockIndex, c_blockIndex, smAngle, smMag,False, histVec)
+        self.assertTrue(almostEqual( histVec[8],  oneBySqrt2))
+        self.assertTrue(almostEqual( histVec[35], oneBySqrt2))
+        for i in range(0,len(histVec)):
+            if i ==8 or i == 35:
+                continue
+            self.assertEqual(histVec[i], 0)
+
+    def test_computeBlock(self):
+        #black-en image
+        self.grayImg[:,:] = 0
+
+        #Take the cell whose topLeft is (8,8)
+        # Arrange data as shown below for the cell.
+        # this should give 6 *2 elements with a horizontal gradient
+        # so  4th bin in the angle should get contribution from the 12 samples
+        r_blockIndex = 1
+        c_blockIndex = 1
+        r_cellTopLeft=8 * r_blockIndex
+        c_cellTopLeft=8 * c_blockIndex
+        """
+          #cell 8,8
+          64    64  64   64   64   64   64   64
+          64    64  64   64   64   64   64   64
+          64    64  64   64   64   64   64   64
+          64    64  64   64   64   64   64   64
+
+          128  128  128  128  128  128  128  128
+          128  128  128  128  128  128  128  128
+          128  128  128  128  128  128  128  128
+          128  128  128  128  128  128  128  128
+
+        """
+        self.grayImg[r_cellTopLeft:r_cellTopLeft+4,c_cellTopLeft:c_cellTopLeft+8] = 64
+        self.grayImg[r_cellTopLeft+4:r_cellTopLeft+8,c_cellTopLeft:c_cellTopLeft+8] = 128
+
+
+
+        smAngle = hogc.StatsMaker("angle")
+        smMag = hogc.StatsMaker("magnitude")
+        aHistTemplate = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.One, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
+        histVec = hogc.FloatVec()
+        hog.computeBlock( self.grayImg, aHistTemplate, r_blockIndex, c_blockIndex, smAngle, smMag,False, histVec)
+        self.assertTrue(hog.validateHistogramResultForBlock(aHistTemplate, histVec))
+        self.assertEqual( histVec[8], 12)
+        for i in range(0,len(histVec)):
+            if i == 8:
+                continue
+            self.assertEqual(histVec[i], 0)
+        aHistTemplate = hogc.AngleHistogram(9, 0, math.pi, hogc.AngleHistogram.ContributionPolicy.Magnitude, hogc.AngleHistogram.InterpolationPolicy.YesInterpolation)
+        hog = hogc.Hog(self.hogScheme, hogc.Hog.BlockGaussianWeightingPolicy.NoGaussian, hogc.Hog.BlockNormalizationPolicy.NoNormalization)
+        histVec = hogc.FloatVec()
+        hog.computeBlock( self.grayImg, aHistTemplate, r_blockIndex, c_blockIndex, smAngle, smMag,False, histVec)
+        self.assertTrue(hog.validateHistogramResultForBlock(aHistTemplate, histVec))
+        self.assertEqual( histVec[8], 12 * (128 - 64)*0.5)
+        for i in range(0,len(histVec)):
+            if i ==8:
+                continue
+            self.assertEqual(histVec[i], 0)
 
 class TestHistogram1fi(unittest.TestCase):
 
