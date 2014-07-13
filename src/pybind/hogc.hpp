@@ -1,6 +1,9 @@
 #if !defined(HOGC_HPP_)
 #define HOGC_HPP_
 
+
+#include <boost/numpy.hpp>
+
 #include "kgeorge_cv/kgUtils.hpp"
 #include <iostream>
 namespace np = boost::numpy;
@@ -166,10 +169,15 @@ std::string describeStatsMaker( const Kg::StatsMaker & sm);
 
 
 
+
 //since I haven't fuond a  way to write boost=python method where std::string
 //can e passed as a reference
 template <typename H>
-std::string describeHistogram( const H & hist, bool bVerbose);
+std::string describeHistogram( const H & hist, bool bVerbose) {
+    std::string desc;
+    hist.describe(desc, bVerbose);
+    return desc;
+}
 
 std::string serializeFloatVec(const std::vector<float> &floatVec);
 

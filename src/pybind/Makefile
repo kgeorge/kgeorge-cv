@@ -79,7 +79,7 @@ LDFLAGS= -shared $(BOOST-LIBS) -lpython$(PYTHON_VERSION)
 
 BUILD-DIR=build
 #MAIN=$(addprefix $(BUILD-DIR)/, main.o )
-OBJS=$(addprefix $(BUILD-DIR)/, hogc.o)
+OBJS=$(addprefix $(BUILD-DIR)/, hogc.o  hogpy.o)
 PROG=$(BUILD-DIR)/hogc
 
 
