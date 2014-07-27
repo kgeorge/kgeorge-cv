@@ -5,13 +5,13 @@
 
   + Get a local copy of the training and test csv file. Assume they are in "/Users/kgeorge/Downloads/pml-training.csv" and "/Users/kgeorge/Downloads/pml-testing.csv"  
 <pre>
-	# read training data into data_training_raw
+	// read training data into data_training_raw
  	data_training_raw <- read.csv("/Users/kgeorge/Downloads/pml-training.csv", header=TRUE, na.strings=c("#DIV/0!"))
 
-	# get another coopy of the training data
+	// get another coopy of the training data
  	data_training_raw_copy <- read.csv("/Users/kgeorge/Downloads/pml-training.csv", header=TRUE, na.strings=c("#DIV/0!"))
  	
-	# read testing data into data_testing_raw
+	// read testing data into data_testing_raw
 	data_testing_raw <- read.csv("/Users/kgeorge/Downloads/pml-testing.csv", header=TRUE, na.strings=c("#DIV/0!"))
 </pre>
 
