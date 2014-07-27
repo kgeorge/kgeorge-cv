@@ -6,13 +6,13 @@
   + Get a local copy of the training and test csv file. Assume they are in "/Users/kgeorge/Downloads/pml-training.csv" and "/Users/kgeorge/Downloads/pml-testing.csv"  
 <pre>
 	// read training data into data_training_raw
- 	data_training_raw <- read.csv("/Users/kgeorge/Downloads/pml-training.csv", header=TRUE, na.strings=c("#DIV/0!"))
+ 	data_training_raw = read.csv("/Users/kgeorge/Downloads/pml-training.csv", header=TRUE, na.strings=c("#DIV/0!"))
 
 	// get another coopy of the training data
- 	data_training_raw_copy <- read.csv("/Users/kgeorge/Downloads/pml-training.csv", header=TRUE, na.strings=c("#DIV/0!"))
+ 	data_training_raw_copy = read.csv("/Users/kgeorge/Downloads/pml-training.csv", header=TRUE, na.strings=c("#DIV/0!"))
  	
 	// read testing data into data_testing_raw
-	data_testing_raw <- read.csv("/Users/kgeorge/Downloads/pml-testing.csv", header=TRUE, na.strings=c("#DIV/0!"))
+	data_testing_raw = read.csv("/Users/kgeorge/Downloads/pml-testing.csv", header=TRUE, na.strings=c("#DIV/0!"))
 </pre>
 
    + The first row of the csv file contains column names, so <code>header=TRUE</code> in the above code. Also, there are entries whose values are #DIV/0! in some cells, (row & column), Such entries should be treated as "NA". Hence the option <code>na.strings=c("#DIV/0!")</code>
