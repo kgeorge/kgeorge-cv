@@ -19,8 +19,8 @@
 
    + Let us first work on the <code>data_training_raw</code>. Let us select only the numeric columns from <code>data_training_raw</code> into <code>data_training_relevant</code>
    <pre>
-	numeric_columns <- sapply(data_training_raw, is.numeric)
-	data_training_relevant <- data_training_raw[, numeric_columns]
+	numeric_columns = sapply(data_training_raw, is.numeric)
+	data_training_relevant = data_training_raw[, numeric_columns]
    </pre>
 
   + Some of the non-numeric columns that we filtered out in the above code are still relevant, so they need be put back in
@@ -42,11 +42,11 @@
   + Let us try to pre-process the training and test data by using either pca or just simple centering and scaling. We choose to use a simple centering and scaling (mean normalization), since our attempt to get pca met with errors. 
   <pre>
 	data_training_numeric_only = subset(data_training_relevant, select=-c(user_name, new_window, classe))
-	preproc <- preProcess(data_training_numeric_only, method=c("center", "scale"),  na.remove=TRUE)
-	data_training_mean_normalized <- predict(preproc, data_training_numeric_only)
+	preproc = preProcess(data_training_numeric_only, method=c("center", "scale"),  na.remove=TRUE)
+	data_training_mean_normalized = predict(preproc, data_training_numeric_only)
 	
-	data_testing_numeric_only <- subset(data_testing_relevant, select=-c(user_name, new_window, classe))
-	data_testing_mean_normalized <- predict(preproc, data_testing_numeric_only)
+	data_testing_numeric_only = subset(data_testing_relevant, select=-c(user_name, new_window, classe))
+	data_testing_mean_normalized = predict(preproc, data_testing_numeric_only)
 
 	data_training_mean_normalized$user_name = data_training_relevant$user_name
 	data_training_mean_normalized$new_window = data_training_relevant$new_window
@@ -58,12 +58,13 @@
 	
   </pre> 
 
+### Training
   + Let us use a k-fold cross-validation with k=10. Cross validation can be easily achieved by means of <code>trainControl</code> in caret package. Let us try with a few methods, a gradient boostig method and a random firest method 
 
    <pre>
       trControl = trainControl(method = "cv", number = 10)
-      modelFitGbm <- train(classe ~., method="gbm", data=data_training_mean_normalized, verbose=FALSE, trControl = trControl)
-      modelFitRf <- train(classe ~., method="rf", data=data_training_mean_normalized, verbose=FALSE, trControl = trControl) 
+      modelFitGbm = train(classe ~., method="gbm", data=data_training_mean_normalized, verbose=FALSE, trControl = trControl)
+      modelFitRf = train(classe ~., method="rf", data=data_training_mean_normalized, verbose=FALSE, trControl = trControl) 
 
    </pre>
 
