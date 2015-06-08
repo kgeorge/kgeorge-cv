@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<title>Segmentation Authoring</title>
+	<style type="text/css">
+		#rr{
+			width:1200px;
+			height:675px;
+			background:#fafafa;
+            border:0px solid #ccc;
+		}
+		#dd{
+			left:100px;
+			top:100px;
+			width:100px;
+			height:100px;
+			background:#fafafa;
+            border:0px solid #ccc;
+			//border:1px solid #ccc;
+			position:absolute;
+			left:300px;
+			top:200px;
+		}
+		#rd{
+			margin:10px;
+			padding:10px;
+			width:100px;
+			height:100px;
+			background:#fafafa;
+            border:0px solid #ccc;
+			//border:1px solid #ccc;
+			position:absolute;
+			left:400px;
+			top:200px;
+		}
+	</style>
+
+	<link rel="stylesheet" type="text/css" href="http://www.jeasyui.com/easyui/themes/default/easyui.css">
+	<link rel="stylesheet" type="text/css" href="http://www.jeasyui.com/easyui/themes/icon.css">
+	<link rel="stylesheet" type="text/css" href="http://www.jeasyui.com/easyui/demo/demo.css">
+	<script type="text/javascript" src="http://code.jquery.com/jquery-1.6.1.min.js"></script>
+	<script type="text/javascript" src="http://www.jeasyui.com/easyui/jquery.easyui.min.js"></script>
+    <!--script type="text/javascript" src="http://code.createjs.com/easeljs-0.8.0.min.js"></script-->
+    <!--script type="text/javascript" src="http://code.createjs.com/preloadjs-0.6.0.min.js"></script-->
+    <!--script type="text/javascript" src="http://code.createjs.com/createjs-2014.12.12.combined.js"></script-->
+    <script type="text/javascript" src="https://code.createjs.com/createjs-2015.05.21.min.js"></script>
+    <!--script type="text/javascript" src="http://rawgithub.com/CreateJS/EaselJS/master/lib/easeljs-NEXT.min.js"></script-->
+
+
+    <script src="./../vendor/js/underscore.js"></script>
+    <script src="./../vendor/js/dat-gui/build/dat.gui.js"></script>
+    <script src="./../vendor/js/namespace.js"></script>
+    <script src="./../vendor/js/class.js"></script>
+
+    <!-- Our own loader -->
+    <script type="text/javascript" src="js/utils.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+	<script>
+		$(function(){
+			$('#rd').draggable({edge:5}).resizable();
+		});
+	</script>
+     <script type="text/javascript">
+         function init() {
+
+            var k = KgeorgeNamespace("K")
+            k.init();
+
+         }
+         function enterpressalert(evt, obj) {
+            var k = KgeorgeNamespace("K")
+            k.keyHandler(evt);
+         }
+         document.onkeydown =  enterpressalert;
+    </script>
+</head>
+<body  onload="init();">
+	<h2>Skin marking</h2>
+        <div class="easyui-layout" fit="true" >
+						<div region="center"  border="false"  >
+                            <!--img src="image/frm/frm3.jpg"-->
+                            <canvas id="demoCanvasFrame" width="949" height="675" style="overflow:scroll"></canvas>
+						</div>
+        </div>
+</body>
+</html>
