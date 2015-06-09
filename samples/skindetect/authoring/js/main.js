@@ -6,9 +6,15 @@
 
     k.g_pickedPoints = {}
 
+    k.sqrDistBetweenPts= function(ptA, ptB) {
+             var sqrDiff = (ptA.x - ptB.x)*(ptA.x - ptB.x) + (ptA.y - ptB.y)*(ptA.y - ptB.y);
+             return sqrDiff
+        }
+    k.minSqrdDistanceToDistinguishPts = 0.1
+
 
     k.Frame = Class.extend( {
-        init: function(canvasId, name, imgUrl) {
+        init: function(canvasId, toolbarId,  name, imgUrl) {
             createjs.Ticker.setFPS(40);
             this.eStates = ["idle", "draw","finishDraw"];
             this.currentState = "idle";
@@ -22,9 +28,12 @@
             this.curvesCollected = []
             this.keyState = {}
             this.nextCurveName = 0;
+            this.canvasId = canvasId;
+            this.toolbarId = toolbarId;
 
             var frameCanvasElement = document.getElementById(canvasId);
             this.stage = new createjs.Stage( frameCanvasElement );
+            this.stage.mouseMoveOutside = false;
             var loader = new createjs.LoadQueue(true, null, true);
 
             loader.addEventListener("fileloaderror",  function(ev){
@@ -54,11 +63,43 @@
             this.boundHandleKeyUp = this.handleKeyUp.bind(this);
 
 
-            this.stage.addEventListener("dblclick" , this.boundHandleMouseDoubleClick );
-            this.stage.addEventListener("stagemousedown", this.boundHandleMouseDown );
+            //this.stage.addEventListener("dblclick" , this.boundHandleMouseDoubleClick );
+            //this.stage.addEventListener("stagemousedown", this.boundHandleMouseDown );
+            //this.stage.addEventListener("mousedown", this.boundHandleMouseDown );
             createjs.Ticker.addEventListener("tick", this.tick.bind(this));
             window.onkeydown =this.boundHandleKeyDown;
             window.onkeyup = this.boundHandleKeyUp;
+
+            _.extend(createjs.Container.prototype, {
+                absolutePos: function(relPos) {
+                    return {x:relPos.x + this.startPoint.x, y: relPos.y + this.startPoint.y};
+                },
+                relativePos: function(absPos) {
+                     return {x:absPos.x - this.startPoint.x, y: absPos.y - this.startPoint.y};
+                },
+                addPointToDraw: function(previousPt, currentPt){
+                    var distBetPts = k.sqrDistBetweenPts( previousPt , currentPt );
+                    if(distBetPts < k.minSqrdDistanceToDistinguishPts) {
+                        return;
+                    }
+                    var midPt = {x: (previousPt.x + currentPt.x)*0.5, y: (previousPt.y + currentPt.y)*0.5}
+                    midPt = this.relativePos(midPt);
+                    var previousPtRelPos = this.relativePos(previousPt);
+                    var currentPtRelPos = this.relativePos(currentPt);
+                    var curveShape = this.getChildByName("curve");
+                    curveShape.graphics.setStrokeStyle(2);
+                    curveShape.graphics.beginStroke(this.drawColor);
+			        curveShape.graphics.moveTo(previousPtRelPos.x, previousPtRelPos.y);
+			        curveShape.graphics.curveTo(midPt.x, midPt.y, currentPtRelPos.x, currentPtRelPos.y );
+			        curveShape.graphics.endStroke();
+			        this.collectedPoints.push( currentPtRelPos);
+			    }
+
+            });
+        },
+        wireupToolbar: function() {
+
+
         },
         loaderImgOnLoad: function(ev) {
             console.log("load error~~~~~~~~~~~~")
@@ -68,12 +109,36 @@
             img.src = ev.result.src;
 
             var bitmap = new createjs.Bitmap(img);
+            bitmap.name = "imageToEdit";
             bitmap.x=0;
             bitmap.y=0;
+
+            var frameCanvasElement = document.getElementById(this.canvasId);
+            var scaleX = frameCanvasElement.width/bitmap.image.width;
+            var scaleY = frameCanvasElement.height/bitmap.image.height;
+            var scale = scaleX;
+            if(scaleY < scaleX) {
+                scale = scaleY;
+            }
+            bitmap.scaleX = scale;
+            bitmap.scaleY = scale;
             console.log("bitmap bounds" , name, bitmap.getBounds())
-            this.stage.addChild(bitmap);
+            var bitmapContainer =new createjs.Container();
+            bitmapContainer.addChild(bitmap);
+
+            this.stage.addChild(bitmapContainer);
             console.log("stage bounds" , name, this.stage.getBounds())
             //this.stage.addChild(this.lineDrawingShape);
+
+
+
+            this.authoringArea = this.stage;
+            this.authoringArea.mouseEnabled = true;
+
+            this.authoringArea.addEventListener("dblclick" , this.boundHandleMouseDoubleClick );
+            //this.authoringArea.addEventListener("stagemousedown", this.boundHandleMouseDown );
+            this.authoringArea.addEventListener("mousedown", this.boundHandleMouseDown );
+
             this.stage.update();
 
         },
@@ -96,10 +161,11 @@
         //-----------------------------------------------------------------------
         handleMouseMove: function (evt) {
             var relPos = {x: evt.stageX, y: evt.stageY};
-            this.stage.addEventListener("pressup", this.boundHandleMouseUp);
+            console.log("MMMMMVVVVV   stage mnouse Up", relPos.x, relPos.y);
+            this.authoringArea.addEventListener("pressup", this.boundHandleMouseUp);
             this.currentPt = relPos;
             var currentCurve = this.stackTopCurvesCollected();
-            currentCurve.collectedPoints.push(relPos);
+           // currentCurve.collectedPoints.push(currentCurve.relativePos(relPos));
             this.pointsCollected.push(relPos);
             this.stage.update();
         },
@@ -107,9 +173,11 @@
         handleMouseUp : function (evt) {
             var relPos = {x: evt.stageX, y: evt.stageY};
             //console.log("UPUPUPUPUPUPP   stage mnouse Up", relPos.x, relPos.y);
-            this.stage.addEventListener("stagemousedown", this.boundHandleMouseDown);
-            this.stage.removeEventListener("pressup", this.boundHandleMouseUp);
-            this.stage.removeEventListener("stagemousemove", this.boundHandleMouseMove);
+            //this.authoringArea.addEventListener("stagemousedown", this.boundHandleMouseDown);
+            this.authoringArea.addEventListener("mousedown", this.boundHandleMouseDown);
+            this.authoringArea.removeEventListener("pressup", this.boundHandleMouseUp);
+            this.authoringArea.removeEventListener("stagemousemove", this.boundHandleMouseMove);
+            //this.authoringArea.removeEventListener("mousemove", this.boundHandleMouseMove);
             this.currentState = "idle";
             this.stage.update();
 
@@ -118,8 +186,10 @@
         handleMouseDoubleClick : function(evt) {
             var relPos = {x: evt.stageX, y: evt.stageY};
             //console.log("DCDCDCDCDCDCDC  stage mnouse down", relPos.x, relPos.y);
-            this.stage.removeEventListener("stagemousemove" , this.boundHandleMouseMove);
+            this.authoringArea.removeEventListener("stagemousemove" , this.boundHandleMouseMove);
+            //this.authoringArea.removeEventListener("mousemove" , this.boundHandleMouseMove);
             this.currentState = "finishDraw";
+
         },
         //-----------------------------------------------------------------------
         handleMouseDown : function(evt) {
@@ -127,6 +197,9 @@
 
 
             var container = new createjs.Container();
+            container.set({x:relPos.x, y: relPos.y});
+            container.startPoint = relPos;
+            container.drawColor = createjs.Graphics.getHSL(Math.random()*360, 100, 50);
             container.name = this.nextCurveName;
             this.nextCurveName += 1;
 
@@ -138,7 +211,7 @@
 
 
 
-            var startPoint = new createjs.Shape().set({x:relPos.x, y: relPos.y});
+            var startPoint = new createjs.Shape().set({x:0, y: 0});
             startPoint.snapToPixelEnabled = true;
             container.addChild(startPoint);
             startPoint.graphics.beginFill("blue");
@@ -150,14 +223,15 @@
 
             this.pushCurvesCollected(container);
 
-            this.stage.addEventListener("stagemousemove" , this.boundHandleMouseMove);
+            //this.authoringArea.addEventListener("mousemove" , this.boundHandleMouseMove);
+            this.authoringArea.addEventListener("stagemousemove" , this.boundHandleMouseMove);
             this.currentState = "draw";
             this.previousPt = relPos;
             this.currentPt = relPos;
 
 
             container.collectedPoints = [];
-            container.collectedPoints.push(relPos);
+            container.collectedPoints.push(container.relativePos(relPos));
             console.log("DDDDDDDDDDDDDDD  stage mnouse down", relPos.x, relPos.y);
 
 
@@ -207,39 +281,65 @@
         },
         //-----------------------------------------------------------------------
         consolidateConsecutveCurves: function() {
+            var indicesToConsolidate = [];
             for(var i = this.curvesCollected.length; i > 0;  i -= 1) {
-                if(i > 1) {
-                    var curveIndex = i-1;
-                    var currentCurve = this.curvesCollected[curveIndex];
-                    var collectedPointsCurrent = currentCurve.collectedPoints;
-                    var firstPointOfCurrentCurve = undefined;
-                    if(collectedPointsCurrent.length > 0) {
-                        firstPointOfCurrentCurve = collectedPointsCurrent[0];
-                    }
+                var curveIndex = i-1;
+                var currentCurve = this.curvesCollected[curveIndex];
+                var collectedPointsCurrent = currentCurve.collectedPoints;
+                var firstPointOfCurrentCurve = undefined;
+                if(collectedPointsCurrent.length > 0) {
+                    firstPointOfCurrentCurve = currentCurve.absolutePos(collectedPointsCurrent[0]);
+                }
+                indicesToConsolidate.unshift(curveIndex);
+                if(i <= 1) {
+                    break;
+                }
 
+                var previousCurve = this.curvesCollected[curveIndex-1];
+                var collectedPointsPreviousCurve = previousCurve.collectedPoints;
+                var lastPointOfPreviousCurve = undefined;
+                if(collectedPointsPreviousCurve.length > 0) {
+                    lastPointOfPreviousCurve = previousCurve.absolutePos(collectedPointsPreviousCurve[collectedPointsPreviousCurve.length-1]);
+                }
+                console.log( "CCCCCCCCCCCCCCCCCCCCC", "name: ", currentCurve.name, "  numPoints: ", currentCurve.collectedPoints.length, "  currentIndex: ",  curveIndex, " previousIndex: ",  curveIndex-1, " distance: ", k.sqrDistBetweenPts(firstPointOfCurrentCurve,  lastPointOfPreviousCurve));
 
-                    var previousCurve = this.curvesCollected[curveIndex-1];
-                    var collectedPointsPreviousCurve = previousCurve.collectedPoints;
-                    var lastPointOfPreviousCurve = undefined;
-                    if(collectedPointsPreviousCurve.length > 0) {
-                        lastPointOfPreviousCurve = collectedPointsPreviousCurve[collectedPointsPreviousCurve.length-1];
-                    }
-                    console.log( "CCCCCCCCCCCCCCCCCCCCC", "name: ", currentCurve.name, "  numPoints: ", currentCurve.collectedPoints.length, "  currentIndex: ",  curveIndex, " previousIndex: ",  curveIndex-1, " distance: ", this.distBetweenPts(firstPointOfCurrentCurve,  lastPointOfPreviousCurve));
+                if(k.sqrDistBetweenPts(firstPointOfCurrentCurve,  lastPointOfPreviousCurve) > 500) {
+                    break;
                 }
             }
+            var motherCurve = this.curvesCollected[indicesToConsolidate[0]];
+            for(var i=1; i < indicesToConsolidate.length; i += 1) {
+                var curveToConsolidate = this.curvesCollected[indicesToConsolidate[i]];
+                this.consolidateTwoCurves(motherCurve, curveToConsolidate );
+            }
+            //assert indicesToConsolidate.length > = 2
+            this.curvesCollected.splice(indicesToConsolidate[1], indicesToConsolidate.length-1)
+            for(var i=this.curvesCollected.length-1; i >= 0; i -= 1) {
+                var currentCurve = this.curvesCollected[i];
+                console.log( "CCCCCCCCCCCCCCCCCCCCC", "name: ", currentCurve.name, "  numPoints: ", currentCurve.collectedPoints.length, " firstPt: ", currentCurve.absolutePos(currentCurve.collectedPoints[0]), " lastPt: ",  currentCurve.absolutePos(currentCurve.collectedPoints[currentCurve.collectedPoints.length-1]));
+            }
+            this.stage.update();
+        },
+
+        consolidateTwoCurves: function(mother, curveToBeConsolidated) {
+            //assert mother.collectedPoints.length > 0;
+            var previousPt = mother.absolutePos(mother.collectedPoints[mother.collectedPoints.length-1]);
+            for(var i=0; i < curveToBeConsolidated.collectedPoints.length; i += 1) {
+                var currentPt =  curveToBeConsolidated.absolutePos(curveToBeConsolidated.collectedPoints[i]);
+                mother.addPointToDraw(previousPt, currentPt);
+                mother.collectedPoints.push(mother.relativePos(currentPt));
+                previousPt = currentPt;
+            }
+            this.stage.removeChild(curveToBeConsolidated);
         },
         //-----------------------------------------------------------------------
-        distBetweenPts: function(ptA, ptB) {
-             var sqrDiff = (ptA.x - ptB.x)*(ptA.x - ptB.x) + (ptA.y - ptB.y)*(ptA.y - ptB.y);
-             return sqrDiff
-        },
+
         //-----------------------------------------------------------------------
         //-----------------------------------------------------------------------
         //tick
         //-----------------------------------------------------------------------
 
         tick: function () {
-            var drawColor = createjs.Graphics.getHSL(Math.random()*360, 100, 50);
             if (Object.keys(this.keyState).length > 0 ) {
                 //keycode for z == 9-, Ctrl == 17
                 if(this.keyState[90]) {
@@ -250,38 +350,25 @@
                 }
             }
             if(this.currentState == "draw") {
-                var midPt = {x: (this.previousPt.x + this.currentPt.x)*0.5, y: (this.previousPt.y + this.currentPt.y)*0.5}
+
                 var lastCurve = this.stackTopCurvesCollected();
                 if(lastCurve) {
-                    var curveShape = lastCurve.getChildByName("curve");
-                    curveShape.graphics.setStrokeStyle(2);
-                    curveShape.graphics.beginStroke(drawColor);
-			        curveShape.graphics.moveTo(this.previousPt.x, this.previousPt.y);
-			        curveShape.graphics.curveTo(midPt.x, midPt.y, this.currentPt.x, this.currentPt.y );
-			        curveShape.graphics.endStroke();
+                    //assert lastCurve.collectedPoints.length >= 1
+                    var previousPt = lastCurve.absolutePos(lastCurve.collectedPoints[lastCurve.collectedPoints.length-1]);
+                    lastCurve.addPointToDraw(previousPt, this.currentPt);
                 }
-
                 this.previousPt = this.currentPt;
-
-
             } else if (this.currentState == "finishDraw") {
                 this.previousPt = this.currentPt;
                 this.consolidateConsecutveCurves();
-
-                if(this.pointsCollected.length > 2) {
+                /*if(this.pointsCollected.length > 2) {
                     this.currentPt = this.pointsCollected[this.pointsCollected.length -3];
                     console.log( "FFFFFFFFFFFFF", this.currentPt, this.previousPt);
                 }
-                var midPt = {x: (this.previousPt.x + this.currentPt.x)*0.5, y: (this.previousPt.y + this.currentPt.y)*0.5};
                 var lastCurve = this.stackTopCurvesCollected();
                 if(lastCurve) {
-                    var curveShape = lastCurve.getChildByName("curve");
-                    curveShape.graphics.setStrokeStyle(2);
-                    curveShape.graphics.beginStroke(drawColor);
-			        curveShape.graphics.moveTo(this.previousPt.x, this.previousPt.y);
-			        curveShape.graphics.curveTo(midPt.x, midPt.y, this.currentPt.x, this.currentPt.y );
-			        curveShape.graphics.endStroke();
-                }
+                    lastCurve.addPointToDraw(this.previousPt, this.currentPt);
+                }*/
                 this.currentState = "idle";
             }
 
@@ -292,7 +379,7 @@
 
     k.init = function () {
         var baseDataDir = "http://localhost:8000/samples/skindetect/authoring/image"
-        k.frame = new k.Frame("demoCanvasFrame", "frame",  baseDataDir + "/frm/frm3.jpg" );
+        k.frame = new k.Frame("demoCanvasFrame", "demoToolbar", "frame",  baseDataDir + "/f16.jpg" );
     }
 
   }
