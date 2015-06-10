@@ -1,6 +1,7 @@
 
 (
   function() {
+
     var kUtils = KgeorgeNamespace("K.Utils")
 
     kUtils.assert = function(bval, msg) {

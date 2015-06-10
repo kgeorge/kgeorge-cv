@@ -12,11 +12,43 @@
         }
     k.minSqrdDistanceToDistinguishPts = 0.1
 
+    k.Mode = Class.extend( {
+        init: function(modename, main){
+            this.modename = modename;
+            this.boundHandleMouseDoubleClick = this.handleMouseDoubleClick.bind(main);
+            this.boundHandleMouseDown = this.handleMouseDown.bind(main);
+            this.boundHandleMouseUp = this.handleMouseUp.bind(main);
+            this.boundHandleMouseMove = this.handleMouseMove.bind(main);
+            this.boundHandleKeyDown  = this.handleKeyDown.bind(main);
+            this.boundHandleKeyUp = this.handleKeyUp.bind(main);
+        },
+        handleMouseDoubleClick: function(evt) {
+
+
+        },
+        handleMouseDown: function(evt) {
+
+        },
+        handleMouseUp: function(evt) {
+
+        },
+        handleMouseMove: function(evt) {
+
+        },
+        handleKeyDown: function(evt) {
+        },
+        handleKeyUp: function(evt) {
+
+        }
+    })
+
 
     k.Frame = Class.extend( {
         init: function(canvasId, toolbarId,  name, imgUrl) {
             createjs.Ticker.setFPS(40);
-            this.eStates = ["idle", "draw","finishDraw"];
+            this.eDrawStates = ["idle", "draw","finishDraw"];
+            this.eModes = {"draw" : new k.Mode("draw", this), "edit": new k.Mode("edit", this)};
+            this.currentMode = undefined;
             this.currentState = "idle";
             this.name = name;
             this.imgUrl = imgUrl;
@@ -30,10 +62,14 @@
             this.nextCurveName = 0;
             this.canvasId = canvasId;
             this.toolbarId = toolbarId;
-
             var frameCanvasElement = document.getElementById(canvasId);
-            this.stage = new createjs.Stage( frameCanvasElement );
-            this.stage.mouseMoveOutside = false;
+            this.stage1 = new createjs.Stage( frameCanvasElement );
+            this.stage1.mouseMoveOutside = false;
+
+            var toolbarCanvasElement =  document.getElementById(toolbarId);
+            this.stage2 = new createjs.Stage( toolbarCanvasElement );
+
+
             var loader = new createjs.LoadQueue(true, null, true);
 
             loader.addEventListener("fileloaderror",  function(ev){
@@ -52,7 +88,7 @@
                 type: createjs.LoadQueue.IMAGE
             });
             loader.loadFile(loadItem);
-            this.stage.enableMouseOver(10);
+            this.stage1.enableMouseOver(10);
 
 
             this.boundHandleMouseDoubleClick = this.handleMouseDoubleClick.bind(this);
@@ -63,9 +99,9 @@
             this.boundHandleKeyUp = this.handleKeyUp.bind(this);
 
 
-            //this.stage.addEventListener("dblclick" , this.boundHandleMouseDoubleClick );
-            //this.stage.addEventListener("stagemousedown", this.boundHandleMouseDown );
-            //this.stage.addEventListener("mousedown", this.boundHandleMouseDown );
+            //this.stage1.addEventListener("dblclick" , this.boundHandleMouseDoubleClick );
+            //this.stage1.addEventListener("stagemousedown", this.boundHandleMouseDown );
+            //this.stage1.addEventListener("mousedown", this.boundHandleMouseDown );
             createjs.Ticker.addEventListener("tick", this.tick.bind(this));
             window.onkeydown =this.boundHandleKeyDown;
             window.onkeyup = this.boundHandleKeyUp;
@@ -96,9 +132,33 @@
 			    }
 
             });
+            this.wireupToolbar();
+        },
+        changeMode: function(modeName) {
+            if(modeName && this.currentMode != this.eModes[modeName]) {
+                this.currentMode = this.eModes[modeName];
+                console.log("mode changes to, ", modeName);
+            }
         },
         wireupToolbar: function() {
+            var modeNames = Object.keys(this.eModes);
+            var radioButtonGroup = new k.RadioButtonGroup(modeNames);
+            radioButtonGroup.x = 5;
+            radioButtonGroup.y = 2;
+            radioButtonGroup.addEventListener("click", function(evt){
+                    this.changeMode(evt.target.label);
+            }.bind(this))
 
+
+            this.stage2.addChild(radioButtonGroup);
+
+            this.stage2.update();
+            var firstButton = radioButtonGroup.getButton(modeNames[0]);
+            var firstButtonDispatchEvent = new createjs.Event("click");
+            firstButtonDispatchEvent.target = firstButton;
+            firstButton.dispatchEvent( firstButtonDispatchEvent);
+            this.stage2.update();
+            this.changeMode(modeNames[0]);
 
         },
         loaderImgOnLoad: function(ev) {
@@ -126,20 +186,20 @@
             var bitmapContainer =new createjs.Container();
             bitmapContainer.addChild(bitmap);
 
-            this.stage.addChild(bitmapContainer);
-            console.log("stage bounds" , name, this.stage.getBounds())
-            //this.stage.addChild(this.lineDrawingShape);
+            this.stage1.addChild(bitmapContainer);
+            console.log("stage bounds" , name, this.stage1.getBounds())
+            //this.stage1.addChild(this.lineDrawingShape);
 
 
 
-            this.authoringArea = this.stage;
+            this.authoringArea = this.stage1;
             this.authoringArea.mouseEnabled = true;
 
             this.authoringArea.addEventListener("dblclick" , this.boundHandleMouseDoubleClick );
             //this.authoringArea.addEventListener("stagemousedown", this.boundHandleMouseDown );
             this.authoringArea.addEventListener("mousedown", this.boundHandleMouseDown );
 
-            this.stage.update();
+            this.stage1.update();
 
         },
         /*
@@ -148,12 +208,12 @@
             bitmap.x=0;
             bitmap.y=0;
             console.log("bitmap bounds" , name, bitmap.getBounds())
-            this.stage.addChild(bitmap);
-            console.log("stage bounds" , name, this.stage.getBounds())
+            this.stage1.addChild(bitmap);
+            console.log("stage bounds" , name, this.stage1.getBounds())
 
 
-            //this.stage.addChild(this.lineDrawingShape);
-            this.stage.update();
+            //this.stage1.addChild(this.lineDrawingShape);
+            this.stage1.update();
         },*/
 
         //-----------------------------------------------------------------------
@@ -167,7 +227,7 @@
             var currentCurve = this.stackTopCurvesCollected();
            // currentCurve.collectedPoints.push(currentCurve.relativePos(relPos));
             this.pointsCollected.push(relPos);
-            this.stage.update();
+            this.stage1.update();
         },
         //-----------------------------------------------------------------------
         handleMouseUp : function (evt) {
@@ -179,7 +239,7 @@
             this.authoringArea.removeEventListener("stagemousemove", this.boundHandleMouseMove);
             //this.authoringArea.removeEventListener("mousemove", this.boundHandleMouseMove);
             this.currentState = "idle";
-            this.stage.update();
+            this.stage1.update();
 
         },
         //-----------------------------------------------------------------------
@@ -218,7 +278,7 @@
             startPoint.graphics.dc(0,0, 2);
             startPoint.name = "startPoint";
 
-            this.stage.addChild(container);
+            this.stage1.addChild(container);
 
 
             this.pushCurvesCollected(container);
@@ -237,7 +297,7 @@
 
             this.pointsCollected.push(relPos);
 
-            this.stage.update();
+            this.stage1.update();
         },
         //-----------------------------------------------------------------------
         handleKeyDown : function(evt) {
@@ -275,7 +335,7 @@
         removeLastCurveShapeFromStage: function() {
             var lastCurveShape = this.stackTopCurvesCollected();
             if (lastCurveShape !== undefined) {
-                this.stage.removeChild(lastCurveShape);
+                this.stage1.removeChild(lastCurveShape);
                 this.popCurvesCollected();
             }
         },
@@ -318,7 +378,7 @@
                 var currentCurve = this.curvesCollected[i];
                 console.log( "CCCCCCCCCCCCCCCCCCCCC", "name: ", currentCurve.name, "  numPoints: ", currentCurve.collectedPoints.length, " firstPt: ", currentCurve.absolutePos(currentCurve.collectedPoints[0]), " lastPt: ",  currentCurve.absolutePos(currentCurve.collectedPoints[currentCurve.collectedPoints.length-1]));
             }
-            this.stage.update();
+            this.stage1.update();
         },
 
         consolidateTwoCurves: function(mother, curveToBeConsolidated) {
@@ -330,7 +390,7 @@
                 mother.collectedPoints.push(mother.relativePos(currentPt));
                 previousPt = currentPt;
             }
-            this.stage.removeChild(curveToBeConsolidated);
+            this.stage1.removeChild(curveToBeConsolidated);
         },
         //-----------------------------------------------------------------------
 
@@ -340,40 +400,46 @@
         //-----------------------------------------------------------------------
 
         tick: function () {
-            if (Object.keys(this.keyState).length > 0 ) {
-                //keycode for z == 9-, Ctrl == 17
-                if(this.keyState[90]) {
-                    if(this.keyState[17] || this.keyState[90].ctrlKey) {
-                        this.removeLastCurveShapeFromStage();
-                        this.keyState = {}
+            if(this.currentMode.modename == "draw") {
+                if (Object.keys(this.keyState).length > 0 ) {
+                    //keycode for z == 9-, Ctrl == 17
+                    if(this.keyState[90]) {
+                        if(this.keyState[17] || this.keyState[90].ctrlKey) {
+                            this.removeLastCurveShapeFromStage();
+                            this.keyState = {}
+                        }
                     }
                 }
-            }
-            if(this.currentState == "draw") {
+                if(this.currentState == "draw") {
 
-                var lastCurve = this.stackTopCurvesCollected();
-                if(lastCurve) {
-                    //assert lastCurve.collectedPoints.length >= 1
-                    var previousPt = lastCurve.absolutePos(lastCurve.collectedPoints[lastCurve.collectedPoints.length-1]);
-                    lastCurve.addPointToDraw(previousPt, this.currentPt);
+                    var lastCurve = this.stackTopCurvesCollected();
+                    if(lastCurve) {
+                        //assert lastCurve.collectedPoints.length >= 1
+                        var previousPt = lastCurve.absolutePos(lastCurve.collectedPoints[lastCurve.collectedPoints.length-1]);
+                        lastCurve.addPointToDraw(previousPt, this.currentPt);
+                    }
+                    this.previousPt = this.currentPt;
+                } else if (this.currentState == "finishDraw") {
+                    this.previousPt = this.currentPt;
+                    this.consolidateConsecutveCurves();
+                    /*if(this.pointsCollected.length > 2) {
+                        this.currentPt = this.pointsCollected[this.pointsCollected.length -3];
+                        console.log( "FFFFFFFFFFFFF", this.currentPt, this.previousPt);
+                    }
+                    var lastCurve = this.stackTopCurvesCollected();
+                    if(lastCurve) {
+                        lastCurve.addPointToDraw(this.previousPt, this.currentPt);
+                    }*/
+                    this.currentState = "idle";
                 }
-                this.previousPt = this.currentPt;
-            } else if (this.currentState == "finishDraw") {
-                this.previousPt = this.currentPt;
-                this.consolidateConsecutveCurves();
-                /*if(this.pointsCollected.length > 2) {
-                    this.currentPt = this.pointsCollected[this.pointsCollected.length -3];
-                    console.log( "FFFFFFFFFFFFF", this.currentPt, this.previousPt);
-                }
-                var lastCurve = this.stackTopCurvesCollected();
-                if(lastCurve) {
-                    lastCurve.addPointToDraw(this.previousPt, this.currentPt);
-                }*/
-                this.currentState = "idle";
-            }
+            } else if (this.currentMode.modename == "edit") {
 
-            this.stage.update();
-            this.stage.tick();
+                console.log("edit mode tick");
+            }
+            this.stage1.update();
+            this.stage1.tick();
+            this.stage2.update();
+            this.stage2.tick();
         }
     });
 
