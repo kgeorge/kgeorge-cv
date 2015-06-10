@@ -21,6 +21,7 @@
             this.boundHandleMouseMove = this.handleMouseMove.bind(main);
             this.boundHandleKeyDown  = this.handleKeyDown.bind(main);
             this.boundHandleKeyUp = this.handleKeyUp.bind(main);
+            this.boundTick = this.tick.bind(main);
         },
         handleMouseDoubleClick: function(evt) {
 
@@ -39,6 +40,126 @@
         },
         handleKeyUp: function(evt) {
 
+        },
+        tick: function() {
+             console.log("edit mode tick");
+        }
+
+    })
+
+    k.DrawMode = k.Mode.extend( {
+        init: function(main){
+            this._super("draw", main);
+        },
+        //-----------------------------------------------------------------------
+        //Mouse/keyboard handlers
+        //-----------------------------------------------------------------------
+        handleMouseMove: function (evt) {
+            var relPos = {x: evt.stageX, y: evt.stageY};
+            console.log("MMMMMVVVVV   stage mnouse Up", relPos.x, relPos.y);
+            this.authoringArea.addEventListener("pressup", this.boundHandleMouseUp);
+            this.currentPt = relPos;
+            var currentCurve = this.stackTopCurvesCollected();
+           // currentCurve.collectedPoints.push(currentCurve.relativePos(relPos));
+            this.pointsCollected.push(relPos);
+            this.stage1.update();
+        },
+        //-----------------------------------------------------------------------
+        handleMouseUp : function (evt) {
+            var relPos = {x: evt.stageX, y: evt.stageY};
+            //console.log("UPUPUPUPUPUPP   stage mnouse Up", relPos.x, relPos.y);
+            //this.authoringArea.addEventListener("stagemousedown", this.boundHandleMouseDown);
+            this.authoringArea.addEventListener("mousedown", this.boundHandleMouseDown);
+            this.authoringArea.removeEventListener("pressup", this.boundHandleMouseUp);
+            this.authoringArea.removeEventListener("stagemousemove", this.boundHandleMouseMove);
+            //this.authoringArea.removeEventListener("mousemove", this.boundHandleMouseMove);
+            this.currentState = "idle";
+            this.stage1.update();
+
+        },
+        //-----------------------------------------------------------------------
+        handleMouseDoubleClick : function(evt) {
+            var relPos = {x: evt.stageX, y: evt.stageY};
+            //console.log("DCDCDCDCDCDCDC  stage mnouse down", relPos.x, relPos.y);
+            this.authoringArea.removeEventListener("stagemousemove" , this.boundHandleMouseMove);
+            //this.authoringArea.removeEventListener("mousemove" , this.boundHandleMouseMove);
+            this.currentState = "finishDraw";
+
+        },
+        //-----------------------------------------------------------------------
+        handleMouseDown : function(evt) {
+            var relPos = {x: evt.stageX, y: evt.stageY};
+
+
+            var container = new createjs.Container();
+            container.set({x:relPos.x, y: relPos.y});
+            container.startPoint = relPos;
+            container.drawColor = createjs.Graphics.getHSL(Math.random()*360, 100, 50);
+            container.name = this.nextCurveName;
+            this.nextCurveName += 1;
+
+
+            var lineDrawingShape = new createjs.Shape().set({x:0,y:0});
+            lineDrawingShape.graphics.beginFill("red");
+            lineDrawingShape.name = "curve";
+            container.addChild(lineDrawingShape);
+
+
+            this.stage1.addChild(container);
+
+
+            this.pushCurvesCollected(container);
+
+            //this.authoringArea.addEventListener("mousemove" , this.boundHandleMouseMove);
+            this.authoringArea.addEventListener("stagemousemove" , this.boundHandleMouseMove);
+            this.currentState = "draw";
+            this.previousPt = relPos;
+            this.currentPt = relPos;
+
+
+            container.collectedPoints = [];
+            container.collectedPoints.push(container.relativePos(relPos));
+            console.log("DDDDDDDDDDDDDDD  stage mnouse down", relPos.x, relPos.y);
+
+
+            this.pointsCollected.push(relPos);
+
+            this.stage1.update();
+        },
+        //-----------------------------------------------------------------------
+        handleKeyDown : function(evt) {
+
+        },
+        //-----------------------------------------------------------------------
+        handleKeyUp : function(evt) {
+            evt = evt || window.event;
+            console.log("KKKKKKKKKKKKKKKKKK", evt.keyCode);
+            this.keyState[evt.keyCode] = evt;
+        },
+        tick: function() {
+            if (Object.keys(this.keyState).length > 0 ) {
+                //keycode for z == 9-, Ctrl == 17
+                if(this.keyState[90]) {
+                    if(this.keyState[17] || this.keyState[90].ctrlKey) {
+                        this.removeLastCurveShapeFromStage();
+                        this.keyState = {}
+                    }
+                }
+            }
+            if(this.currentState == "draw") {
+
+                var lastCurve = this.stackTopCurvesCollected();
+                if(lastCurve) {
+                    //assert lastCurve.collectedPoints.length >= 1
+                    var previousPt = lastCurve.absolutePos(lastCurve.collectedPoints[lastCurve.collectedPoints.length-1]);
+                    lastCurve.addPointToDraw(previousPt, this.currentPt);
+                }
+                this.previousPt = this.currentPt;
+            } else if (this.currentState == "finishDraw") {
+                this.previousPt = this.currentPt;
+                this.consolidateConsecutveCurves();
+                this.currentState = "idle";
+            }
         }
     })
 
@@ -47,7 +168,7 @@
         init: function(canvasId, toolbarId,  name, imgUrl) {
             createjs.Ticker.setFPS(40);
             this.eDrawStates = ["idle", "draw","finishDraw"];
-            this.eModes = {"draw" : new k.Mode("draw", this), "edit": new k.Mode("edit", this)};
+            this.eModes = {"draw" : new k.DrawMode(this), "edit": new k.Mode("edit", this)};
             this.currentMode = undefined;
             this.currentState = "idle";
             this.name = name;
@@ -220,94 +341,27 @@
         //Mouse/keyboard handlers
         //-----------------------------------------------------------------------
         handleMouseMove: function (evt) {
-            var relPos = {x: evt.stageX, y: evt.stageY};
-            console.log("MMMMMVVVVV   stage mnouse Up", relPos.x, relPos.y);
-            this.authoringArea.addEventListener("pressup", this.boundHandleMouseUp);
-            this.currentPt = relPos;
-            var currentCurve = this.stackTopCurvesCollected();
-           // currentCurve.collectedPoints.push(currentCurve.relativePos(relPos));
-            this.pointsCollected.push(relPos);
-            this.stage1.update();
+            this.currentMode.boundHandleMouseMove(evt);
         },
         //-----------------------------------------------------------------------
         handleMouseUp : function (evt) {
-            var relPos = {x: evt.stageX, y: evt.stageY};
-            //console.log("UPUPUPUPUPUPP   stage mnouse Up", relPos.x, relPos.y);
-            //this.authoringArea.addEventListener("stagemousedown", this.boundHandleMouseDown);
-            this.authoringArea.addEventListener("mousedown", this.boundHandleMouseDown);
-            this.authoringArea.removeEventListener("pressup", this.boundHandleMouseUp);
-            this.authoringArea.removeEventListener("stagemousemove", this.boundHandleMouseMove);
-            //this.authoringArea.removeEventListener("mousemove", this.boundHandleMouseMove);
-            this.currentState = "idle";
-            this.stage1.update();
-
+            this.currentMode.boundHandleMouseUp(evt);
         },
         //-----------------------------------------------------------------------
         handleMouseDoubleClick : function(evt) {
-            var relPos = {x: evt.stageX, y: evt.stageY};
-            //console.log("DCDCDCDCDCDCDC  stage mnouse down", relPos.x, relPos.y);
-            this.authoringArea.removeEventListener("stagemousemove" , this.boundHandleMouseMove);
-            //this.authoringArea.removeEventListener("mousemove" , this.boundHandleMouseMove);
-            this.currentState = "finishDraw";
-
+            this.currentMode.boundHandleMouseDoubleClick(evt);
         },
         //-----------------------------------------------------------------------
         handleMouseDown : function(evt) {
-            var relPos = {x: evt.stageX, y: evt.stageY};
-
-
-            var container = new createjs.Container();
-            container.set({x:relPos.x, y: relPos.y});
-            container.startPoint = relPos;
-            container.drawColor = createjs.Graphics.getHSL(Math.random()*360, 100, 50);
-            container.name = this.nextCurveName;
-            this.nextCurveName += 1;
-
-
-            var lineDrawingShape = new createjs.Shape().set({x:0,y:0});
-            lineDrawingShape.graphics.beginFill("red");
-            lineDrawingShape.name = "curve";
-            container.addChild(lineDrawingShape);
-
-
-
-            var startPoint = new createjs.Shape().set({x:0, y: 0});
-            startPoint.snapToPixelEnabled = true;
-            container.addChild(startPoint);
-            startPoint.graphics.beginFill("blue");
-            startPoint.graphics.dc(0,0, 2);
-            startPoint.name = "startPoint";
-
-            this.stage1.addChild(container);
-
-
-            this.pushCurvesCollected(container);
-
-            //this.authoringArea.addEventListener("mousemove" , this.boundHandleMouseMove);
-            this.authoringArea.addEventListener("stagemousemove" , this.boundHandleMouseMove);
-            this.currentState = "draw";
-            this.previousPt = relPos;
-            this.currentPt = relPos;
-
-
-            container.collectedPoints = [];
-            container.collectedPoints.push(container.relativePos(relPos));
-            console.log("DDDDDDDDDDDDDDD  stage mnouse down", relPos.x, relPos.y);
-
-
-            this.pointsCollected.push(relPos);
-
-            this.stage1.update();
+            this.currentMode.boundHandleMouseDown(evt);
         },
         //-----------------------------------------------------------------------
         handleKeyDown : function(evt) {
-
+            this.currentMode.boundHandleKeyDown(evt);
         },
         //-----------------------------------------------------------------------
         handleKeyUp : function(evt) {
-            evt = evt || window.event;
-            console.log("KKKKKKKKKKKKKKKKKK", evt.keyCode);
-            this.keyState[evt.keyCode] = evt;
+            this.currentMode.boundHandleKeyUp(evt);
         },
 
         //-----------------------------------------------------------------------
@@ -400,42 +454,7 @@
         //-----------------------------------------------------------------------
 
         tick: function () {
-            if(this.currentMode.modename == "draw") {
-                if (Object.keys(this.keyState).length > 0 ) {
-                    //keycode for z == 9-, Ctrl == 17
-                    if(this.keyState[90]) {
-                        if(this.keyState[17] || this.keyState[90].ctrlKey) {
-                            this.removeLastCurveShapeFromStage();
-                            this.keyState = {}
-                        }
-                    }
-                }
-                if(this.currentState == "draw") {
-
-                    var lastCurve = this.stackTopCurvesCollected();
-                    if(lastCurve) {
-                        //assert lastCurve.collectedPoints.length >= 1
-                        var previousPt = lastCurve.absolutePos(lastCurve.collectedPoints[lastCurve.collectedPoints.length-1]);
-                        lastCurve.addPointToDraw(previousPt, this.currentPt);
-                    }
-                    this.previousPt = this.currentPt;
-                } else if (this.currentState == "finishDraw") {
-                    this.previousPt = this.currentPt;
-                    this.consolidateConsecutveCurves();
-                    /*if(this.pointsCollected.length > 2) {
-                        this.currentPt = this.pointsCollected[this.pointsCollected.length -3];
-                        console.log( "FFFFFFFFFFFFF", this.currentPt, this.previousPt);
-                    }
-                    var lastCurve = this.stackTopCurvesCollected();
-                    if(lastCurve) {
-                        lastCurve.addPointToDraw(this.previousPt, this.currentPt);
-                    }*/
-                    this.currentState = "idle";
-                }
-            } else if (this.currentMode.modename == "edit") {
-
-                console.log("edit mode tick");
-            }
+            this.currentMode.boundTick();
             this.stage1.update();
             this.stage1.tick();
             this.stage2.update();
