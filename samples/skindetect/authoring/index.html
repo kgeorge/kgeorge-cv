@@ -47,7 +47,9 @@
     <script type="text/javascript" src="https://code.createjs.com/createjs-2015.05.21.min.js"></script>
     <!--script type="text/javascript" src="http://rawgithub.com/CreateJS/EaselJS/master/lib/easeljs-NEXT.min.js"></script-->
 
-
+    <script src="./../../../js/vendor/js/URI.js"></script>
+    <script src="./../../../js/vendor/js/canvas-toBlob.js/canvas-toBlob.js"></script>
+    <script src="./../../../js/vendor/js/FileSaver.js/FileSaver.js"></script>
     <script src="./../../../js/vendor/js/underscore.js"></script>
     <script src="./../../../js/vendor/js/dat-gui/build/dat.gui.js"></script>
     <script src="./../../../js/vendor/js/namespace.js"></script>
@@ -56,6 +58,11 @@
     <!-- Our own loader -->
     <script type="text/javascript" src="js/utils.js"></script>
     <script type="text/javascript" src="js/createJSUtils.js"></script>
+    <script type="text/javascript" src="js/base.js"></script>
+    <script type="text/javascript" src="js/draw.js"></script>
+    <script type="text/javascript" src="js/edit.js"></script>
+    <script type="text/javascript" src="js/connect.js"></script>
+    <script type="text/javascript" src="js/save.js"></script>
     <script type="text/javascript" src="js/main.js"></script>
 	<script>
 		$(function(){
@@ -64,9 +71,10 @@
 	</script>
      <script type="text/javascript">
          function init() {
-
+            query = URI(document.URL).query(true);
+            //console.log(" ~~~~~~~~~~~~ query ~~~~~~~~~~~ ",query);
             var k = KgeorgeNamespace("K")
-            k.init();
+            k.init(query);
 
          }
          function enterpressalert(evt, obj) {
