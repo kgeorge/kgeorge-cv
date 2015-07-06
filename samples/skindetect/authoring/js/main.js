@@ -264,7 +264,7 @@
     });
 
     K.init = function (query) {
-        var sourceImgFilename = query.sourceImgFilename || "f17.jpg"
+        var sourceImgFilename = query.sourceImgFilename || "f0.jpg"
         var baseDataDir = "http://localhost:8000/samples/skindetect/authoring/image/"
         K.frame = new K.Frame("demoCanvasFrame", "demoToolbar", "frame",  baseDataDir, sourceImgFilename );
     }
