@@ -2,21 +2,21 @@
 (
   function() {
 
-    var kUtils = KgeorgeNamespace("K.Utils")
+    var KUtils = KgeorgeNamespace("K.Utils")
 
-    kUtils.assert = function(bval, msg) {
+    KUtils.assert = function(bval, msg) {
         if(!bval) {
             console.error(msg);
             throw new Error(msg);
         }
     }
 
-    kUtils.espilonEq = function(a, b) {
+    KUtils.espilonEq = function(a, b) {
         return Math.abs(a-b) < 0.000001;
     }
 
 
-    kUtils.download = function (strData, strFileName, strMimeType) {
+    KUtils.download = function (strData, strFileName, strMimeType) {
         var D = document,
         A = arguments,
         a = D.createElement("a"),

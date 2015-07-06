@@ -1,21 +1,21 @@
 
 (
   function() {
-    var k = KgeorgeNamespace("K")
-    var kUtils = KgeorgeNamespace("K.Utils")
+    var K = KgeorgeNamespace("K")
+    var KUtils = KgeorgeNamespace("K.Utils")
 
-    k.g_pickedPoints = {}
+    K.g_pickedPoints = {}
 
-    k.sqrDistBetweenPts= function(ptA, ptB) {
+    K.sqrDistBetweenPts= function(ptA, ptB) {
              var sqrDiff = (ptA.x - ptB.x)*(ptA.x - ptB.x) + (ptA.y - ptB.y)*(ptA.y - ptB.y);
              return sqrDiff
         }
-    k.minSqrdDistanceToDistinguishPts = 50;
-     k.minSqrdDistanceToDistinguishPts2 = 2000;
+    K.minSqrdDistanceToDistinguishPts = 50;
+     K.minSqrdDistanceToDistinguishPts2 = 2000;
 
 
 
-    k.SaveMode = k.Mode.extend( {
+    K.SaveMode = K.Mode.extend( {
         init: function(main){
             this._super("save", main);
             this.resetSelection();
@@ -99,29 +99,55 @@
                 //this.currentMode.currentCurvesSelected
             this.currentMode.currentState = "idle";
         },
+        cleanBeforeSwitch: function() {
+            var test = this.main.stage1.getChildByName("test");
+            this.main.stage1.removeChild(test);
+            this.currentState = "idle";
+        },
+
+        test: function() {
+            if(this.main.collectedCurves.length <= 0) {
+
+            }
+            var currentCurve = this.main.collectedCurves[0];
+            var cRel = currentCurve.centroidRelative();
+            var cAbs = currentCurve.absolutePos(cRel);
+
+            var testContainer = this.main.stage1.getChildByName("test");
+            if(!testContainer) {
+                testContainer = new createjs.Container();
+                testContainer.name = "test";
+                this.main.stage1.addChild(testContainer);
+            }
+            var centroidShape = new createjs.Shape();
+            centroidShape.x = cAbs.x;
+            centroidShape.y = cAbs.y;
+            centroidShape.graphics.clear();
+            centroidShape.graphics.beginFill("red");
+            centroidShape.graphics.dc(0,0, 4);
+            centroidShape.graphics.endFill();
+            testContainer.addChild(centroidShape);
+            this.main.stage1.update();
+
+            currentCurve.inside(cRel);
+
+            console.log("~~~~~~~~~~~~~ test",  currentCurve.inside(cRel));
+            currentCurve.normalizeCurveDirection();
+            console.log("~~~~~~~~~~~~~ test",  currentCurve.inside(cRel));
+
+
+        },
+
+
 
 
         tick: function() {
-            if(this.currentMode.currentState == "finishDraw") {
 
-                this.updateImageVisibility(false);
-                this.stage1.update();
-                var frameCanvasElement = document.getElementById(this.canvasId);
-                //var data = frameCanvasElement.toDataURL("image/png").replace("image/png", "image/octet-stream");
-                //window.location.href = data;
-                var srcImgFilename = this.srcImgFilename;
-                var canvasCopy = document.createElement("canvas");
-                var copyContext = canvasCopy.getContext("2d");
-                canvasCopy.width = frameCanvasElement.width/this.srcImgScale;
-                canvasCopy.height = frameCanvasElement.height/this.srcImgScale;
-                if(this.srcImgScale > 0) {
-                    copyContext.drawImage(frameCanvasElement, 0, 0, frameCanvasElement.width, frameCanvasElement.height, 0, 0, canvasCopy.width, canvasCopy.height);
-                }
-
-                canvasCopy.toBlob(function(blob) {
-                    saveAs(blob, "skindetect-" + srcImgFilename );
-                });
-                //Canvas2Image.saveAsPNG(frameCanvasElement);
+            if(this.currentMode.currentState == "draw") {
+                //this.currentMode.test();
+                this.currentMode.currentState = "idle"
+            } else if(this.currentMode.currentState == "finishDraw") {
+                this.save();
                 this.currentMode.currentState = "idle"
             } else {
                 this.updateImageVisibility(true);

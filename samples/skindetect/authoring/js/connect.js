@@ -2,7 +2,7 @@
 (
   function() {
     var k = KgeorgeNamespace("K")
-    var kUtils = KgeorgeNamespace("K.Utils")
+    var KUtils = KgeorgeNamespace("K.Utils")
 
     k.g_pickedPoints = {}
 
@@ -106,6 +106,27 @@
                 //this.currentMode.currentCurvesSelected
             this.currentMode.currentState = "idle";
         },
+        cleanBeforeSwitch: function() {
+            this.resetSelection();
+        },
+
+        linkCurvesAsParentChild: function() {
+            if(this.currentCurvesSelected.length < 2) {
+                return;
+            }
+            var motherCurve = this.currentCurvesSelected[0];
+            motherCurve.normalizeCurveDirection();
+            var childCurve = this.currentCurvesSelected[1];
+            childCurve.normalizeCurveDirection();
+            motherCurve.addChildCurve(childCurve);
+            var indexOfChildCurve = this.main.collectedCurves.indexOf(childCurve);
+            if(indexOfChildCurve >= 0) {
+                this.main.collectedCurves.splice(indexOfChildCurve, 1);
+            }
+            motherCurve.redrawAllPoints("blue");
+            motherCurve.redrawCurveShapeGraphics(false);
+            alert("curve " + childCurve.name + " is  a hole of " + motherCurve.name);
+        },
 
 
         //-----------------------------------------------------------------------
@@ -122,18 +143,22 @@
             }
 
             var motherCurve =  this.currentCurvesSelected[0];
+            var isMotherCurveNormalized = motherCurve.isNormalized();
             if( this.currentCurvesSelected.length > 1) {
                 for(var i=1; i < this.currentCurvesSelected.length; i += 1) {
+
                     var didConsolidated = this.consolidateTwoCurves(motherCurve, this.currentCurvesSelected[i] );
                     if(didConsolidated) {
                         var indexOfConsolidatedCurve = this.main.collectedCurves.indexOf(this.currentCurvesSelected[i]);
-                        kUtils.assert((indexOfConsolidatedCurve > -1), "error logic")
+                        KUtils.assert((indexOfConsolidatedCurve > -1), "error logic")
                         this.main.collectedCurves.splice(indexOfConsolidatedCurve, 1);
                         this.main.stage1.removeChild( this.currentCurvesSelected[i]);
                     }
                 }
+                var isMotherCurveNormalized = motherCurve.isNormalized();
             } else {
                 motherCurve.bClosedCurve = true;
+                motherCurve.normalizeCurveDirection();
             }
             motherCurve.redrawAllPoints("blue");
             var bFill = true;
@@ -154,12 +179,12 @@
             var firstPointOfSubject = curveToBeConsolidated.absolutePos ( pointsContainerSubject.children[0] );
             var firstPointOfMother = mother.absolutePos( pointsContainerMother.children[0] );
             var lastPointOfSubject = curveToBeConsolidated.absolutePos( pointsContainerSubject.children.slice(-1)[0] );
-            var sqrDistLastFirst = k.sqrDistBetweenPts( lastPointOfMother ,firstPointOfSubject);
-            var sqrDistFirstLast =   k.sqrDistBetweenPts(firstPointOfMother, lastPointOfSubject);
-            var sqrDistFirstFirst =   k.sqrDistBetweenPts(firstPointOfMother, firstPointOfSubject);
-            var sqrDistLastLast =   k.sqrDistBetweenPts(lastPointOfMother, lastPointOfSubject);
+            var sqrDistLastFirst = K.sqrDistBetweenPts( lastPointOfMother ,firstPointOfSubject);
+            var sqrDistFirstLast =   K.sqrDistBetweenPts(firstPointOfMother, lastPointOfSubject);
+            var sqrDistFirstFirst =   K.sqrDistBetweenPts(firstPointOfMother, firstPointOfSubject);
+            var sqrDistLastLast =   K.sqrDistBetweenPts(lastPointOfMother, lastPointOfSubject);
             var minSqrDistance = Math.min(  sqrDistLastFirst,   sqrDistFirstLast , sqrDistFirstFirst, sqrDistLastLast  );
-            if(  minSqrDistance > k.minSqrdDistanceToDistinguishPts2) {
+            if(  minSqrDistance > K.minSqrdDistanceToDistinguishPts2) {
                 return false;
             }
 
@@ -205,7 +230,13 @@
         },
 
         tick: function() {
-            if(this.currentMode.currentState == "finishDraw") {
+            if (Object.keys(this.keyState).length > 0 ) {
+
+                if(this.keyState[67]) {
+                    this.currentMode.linkCurvesAsParentChild();
+                    this.keyState = {}
+                }
+            } else if(this.currentMode.currentState == "finishDraw") {
 
 
                 var curvesConsolidated ="";

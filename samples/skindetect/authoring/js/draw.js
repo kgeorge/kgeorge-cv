@@ -1,19 +1,19 @@
 
 (
   function() {
-    var k = KgeorgeNamespace("K")
-    var kUtils = KgeorgeNamespace("K.Utils")
+    var K = KgeorgeNamespace("K")
+    var KUtils = KgeorgeNamespace("K.Utils")
 
-    k.g_pickedPoints = {}
+    K.g_pickedPoints = {}
 
-    k.sqrDistBetweenPts= function(ptA, ptB) {
+    K.sqrDistBetweenPts= function(ptA, ptB) {
              var sqrDiff = (ptA.x - ptB.x)*(ptA.x - ptB.x) + (ptA.y - ptB.y)*(ptA.y - ptB.y);
              return sqrDiff
         }
-    k.minSqrdDistanceToDistinguishPts = 50;
-     k.minSqrdDistanceToDistinguishPts2 = 2000;
+    K.minSqrdDistanceToDistinguishPts = 50;
+     K.minSqrdDistanceToDistinguishPts2 = 2000;
 
-    k.DrawMode = k.Mode.extend( {
+    K.DrawMode = K.Mode.extend( {
         init: function(main){
             this._super("draw", main);
             this.eDrawStates = ["idle", "draw","finishDraw"];
@@ -54,7 +54,7 @@
         //-----------------------------------------------------------------------
         handleMouseDown : function(evt) {
             var relPos = {x: evt.stageX, y: evt.stageY};
-            var newCurve = new k.Curve(relPos,  this.nextCurveName);
+            var newCurve = new K.Curve(relPos,  this.nextCurveName);
             this.nextCurveName += 1;
 
             this.stage1.addChild(newCurve);
@@ -86,6 +86,8 @@
             this.keyState[evt.keyCode] = evt;
         },
         tick: function() {
+            var drawFillMode=false;
+            var drawClear = false;
             if (Object.keys(this.keyState).length > 0 ) {
                 //keycode for z == 9-, Ctrl == 17
                 if(this.keyState[90]) {
@@ -93,9 +95,23 @@
                         this.removeLastCurveShapeFromStage();
                         this.keyState = {}
                     }
+                } else if(this.keyState[70]) {
+                    drawFillMode = true;
+                    for(var k=0; k < this.collectedCurves.length; k += 1) {
+                        var currentCurve = this.collectedCurves[k];
+                        currentCurve.redrawCurveShapeGraphics(drawFillMode);
+                    }
+                    this.keyState = {}
+                } else if(this.keyState[67]) {
+
+                    drawFillMode = false;
+                    for(var k=0; k < this.collectedCurves.length; k += 1) {
+                        var currentCurve = this.collectedCurves[k];
+                        currentCurve.redrawCurveShapeGraphics(drawFillMode);
+                    }
+                    this.keyState = {}
                 }
-            }
-            if(this.currentMode.currentState == "draw") {
+            } else if (this.currentMode.currentState == "draw") {
 
                 var lastCurve = this.stackTopCurvesCollected();
                 if(lastCurve) {

@@ -1,23 +1,24 @@
 
 (
   function() {
-    var k = KgeorgeNamespace("K")
-    var kUtils = KgeorgeNamespace("K.Utils")
+    var K = KgeorgeNamespace("K")
+    var KUtils = KgeorgeNamespace("K.Utils")
 
-    k.g_pickedPoints = {}
+    K.g_pickedPoints = {}
 
-    k.sqrDistBetweenPts= function(ptA, ptB) {
+    K.sqrDistBetweenPts= function(ptA, ptB) {
              var sqrDiff = (ptA.x - ptB.x)*(ptA.x - ptB.x) + (ptA.y - ptB.y)*(ptA.y - ptB.y);
              return sqrDiff
         }
-    k.minSqrdDistanceToDistinguishPts = 50;
-     k.minSqrdDistanceToDistinguishPts2 = 2000;
-    k.EditMode = k.Mode.extend( {
+    K.minSqrdDistanceToDistinguishPts = 50;
+     K.minSqrdDistanceToDistinguishPts2 = 2000;
+    K.EditMode = K.Mode.extend( {
         init: function(main){
             this._super("edit", main);
-            this.eDrawStates = ["idle", "draw","finishDraw"];
+            this.eDrawStates = ["idle", "draw","finishDraw", "move"];
             this.selectedCurve = undefined;
             this.editCurves = []
+            this.intersectingPoints = []
         },
         //-----------------------------------------------------------------------
         //Mouse/keyboard handlers
@@ -57,12 +58,13 @@
             if(this.currentMode.currentState == "idle") {
                 var currentCurve = undefined;
                 var relPos = {x: evt.stageX, y: evt.stageY};
+                var bHit = false;
                 for(var i=0; i < this.collectedCurves.length; i += 1) {
                     currentCurve = this.collectedCurves[i];
                     var currentCurveShape = currentCurve.getChildByName("curve");
                     var localPos = currentCurveShape.globalToLocal(relPos.x, relPos.y);
 
-                    var bHit = currentCurveShape.hitTest(localPos.x, localPos.y);
+                    bHit = currentCurveShape.hitTest(localPos.x, localPos.y);
                     if(bHit) {
                         currentCurve.setPointVisibility(true);
                         console.log("hit curve:, ", currentCurve.name);
@@ -71,10 +73,15 @@
                         break;
                     }
                 }
+                if(!bHit) {
+                    this.currentMode.currentState = "move";
+                this.previousPt = relPos;
+                this.currentPt = relPos;
+                }
             } else if(this.currentMode.currentState == "draw") {
 
                 var relPos = {x: evt.stageX, y: evt.stageY};
-                var newCurve = new k.Curve(relPos,  this.nextCurveName);
+                var newCurve = new K.Curve(relPos,  this.nextCurveName);
                 this.nextCurveName += 1;
 
                 var editContainer = this.stage1.getChildByName("edit");
@@ -91,16 +98,21 @@
                 this.pushCurvesCollected(newCurve);
 
 
-                //this.authoringArea.addEventListener("mousemove" , this.boundHandleMouseMove);
-                this.authoringArea.addEventListener("stagemousemove" , this.boundHandleMouseMove);
                 this.currentMode.currentState = "draw";
                 this.previousPt = relPos;
                 this.currentPt = relPos;
 
 
                 console.log("DDDDDDDDDDDDDDD  stage mnouse down", relPos.x, relPos.y);
+            }  else if(this.currentMode.currentState == "move") {
+
+                this.previousPt = relPos;
+                this.currentPt = relPos;
+
             }
 
+                //this.authoringArea.addEventListener("mousemove" , this.boundHandleMouseMove);
+            this.authoringArea.addEventListener("stagemousemove" , this.boundHandleMouseMove);
 
             this.stage1.update();
         },
@@ -135,7 +147,20 @@
                 this.previousPt = this.currentPt;
             } else if (this.currentMode.currentState == "finishDraw") {
                 this.currentMode.consolidateCurves();
-                this.currentMode.currentState = "idle"
+                var editCurve = this.stackTopCurvesCollected();
+                this.intersectingPoints =  this.currentMode.selectedCurve.findIntersectingPointsWithAnotherCurve(editCurve);
+                this.currentMode.selectedCurve.redrawSomePoints( "red", {x:0, y:0}, this.intersectingPoints);
+                this.currentMode.currentState = "move"
+            } else if (this.currentMode.currentState == "move") {
+            if(this.intersectingPoints && this.currentPt && this.previousPt) {
+                var deltaPos = {x: this.currentPt.x - this.previousPt.x, y: this.currentPt.y - this.previousPt.y};
+                this.currentMode.selectedCurve.redrawSomePoints("blue", deltaPos, this.intersectingPoints);
+                var bFill = false;
+                this.currentMode.selectedCurve.redrawCurveShapeGraphics(bFill);
+                var editCurve = this.stackTopCurvesCollected();
+                editCurve.moveCurve(deltaPos);
+            }
+                this.previousPt = this.currentPt;
             }
         },
         switchFrom: function(previousMode){
@@ -174,17 +199,15 @@
             this.editCurves = [];
             var editCurve = this.main.stage1.getChildByName("edit");
             this.main.stage1.removeChild(editCurve);
-            this.selectedCurve.setPointVisibility(false);
+            if(this.selectedCurve) {
+                this.selectedCurve.setPointVisibility(false);
+            }
             this.currentState = "idle";
+            this.intersectingPoints = [];
         },
 
         //-----------------------------------------------------------------------
         consolidateCurves: function() {
-            var editCurve = this.main.stage1.getChildByName("edit");
-            var curvesToBeConsolidated = editCurve.children;
-            if(curvesToBeConsolidated.length <= 0) {
-                return;
-            }
             var motherCurve =  this.stackTopCurvesCollected();// ;
             motherCurve.bClosedCurve = true;
             motherCurve.redrawAllPoints("blue");

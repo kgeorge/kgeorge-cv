@@ -2,7 +2,7 @@
 (
   function() {
     var k = KgeorgeNamespace("K")
-    var kUtils = KgeorgeNamespace("K.Utils")
+    var KUtils = KgeorgeNamespace("K.Utils")
 
     k.g_pickedPoints = {}
 
@@ -111,7 +111,7 @@
 
             var frameCanvasElement = document.getElementById(this.canvasId);
             var scaleX = frameCanvasElement.width/bitmap.image.width;
-            var scaleY = frameCanvasElement.height/bitmap.image.height;
+            var scaleY = (frameCanvasElement.height - 30)/bitmap.image.height;
             var scale = scaleX;
             if(scaleY < scaleX) {
                 scale = scaleY;
@@ -119,7 +119,7 @@
             bitmap.scaleX = scale;
             bitmap.scaleY = scale;
             this.srcImgScale = scale;
-            console.log("bitmap bounds" , name, bitmap.getBounds())
+            console.log("bitmap bounds" , name, bitmap.getBounds(), scale)
             var bitmapContainer =new createjs.Container();
 
             bitmapContainer.name = "imageToEdit";
@@ -206,9 +206,46 @@
             if (lastCurveShape !== undefined) {
                 var thisParent = lastCurveShape.parent;
                 thisParent.removeChild(lastCurveShape);
+
                 //this.stage1.removeChild(lastCurveShape);
                 this.popCurvesCollected();
             }
+        },
+        changeExt: function(str, newExt){
+            return str.substring(0, str.lastIndexOf(".")) + newExt
+        },
+        save: function() {
+                this.updateImageVisibility(false);
+                this.stage1.update();
+                var bFill =true;
+                var fillColor="white";
+                var fillAlpha = 1.0;
+                for(var k=0; k < this.collectedCurves.length; k +=1) {
+                    var currentCurve = this.collectedCurves[k];
+                    currentCurve.redrawCurveShapeGraphics(bFill, fillAlpha, fillColor);
+                }
+                this.stage1.update();
+                var frameCanvasElement = document.getElementById(this.canvasId);
+                //var data = frameCanvasElement.toDataURL("image/png").replace("image/png", "image/octet-stream");
+                //window.location.href = data;
+                var srcImgFilename = this.changeExt(this.srcImgFilename, ".png");
+                //console.log( "saving image as ", this.changeExt(srcImgFilename, ".png"));
+                var canvasCopy = document.createElement("canvas");
+                var copyContext = canvasCopy.getContext("2d");
+                canvasCopy.width = frameCanvasElement.width/this.srcImgScale;
+                canvasCopy.height = frameCanvasElement.height/this.srcImgScale;
+                if(this.srcImgScale > 0) {
+                    copyContext.drawImage(frameCanvasElement, 0, 0, frameCanvasElement.width, frameCanvasElement.height, 0, 0, canvasCopy.width, canvasCopy.height);
+                }
+
+                canvasCopy.toBlob(function(blob) {
+                    saveAs(blob, "skindetect-" + srcImgFilename );
+                });
+
+                for(var k=0; k < this.collectedCurves.length; k +=1) {
+                    var currentCurve = this.collectedCurves[k];
+                    currentCurve.redrawCurveShapeGraphics(bFill);
+                }
         },
         //-----------------------------------------------------------------------
 
@@ -226,10 +263,10 @@
         }
     });
 
-    k.init = function (query) {
+    K.init = function (query) {
         var sourceImgFilename = query.sourceImgFilename || "f17.jpg"
         var baseDataDir = "http://localhost:8000/samples/skindetect/authoring/image/"
-        k.frame = new k.Frame("demoCanvasFrame", "demoToolbar", "frame",  baseDataDir, sourceImgFilename );
+        K.frame = new K.Frame("demoCanvasFrame", "demoToolbar", "frame",  baseDataDir, sourceImgFilename );
     }
 
   }

@@ -2,7 +2,7 @@
 (
   function() {
 
-    var k = KgeorgeNamespace("K")
+    var K = KgeorgeNamespace("K")
 
     Button = function(label, color) {
         this.Container_constructor();
@@ -60,7 +60,7 @@
     };
 
 
-    k.Button = createjs.promote(Button, "Container");
+    K.Button = createjs.promote(Button, "Container");
 
 
 
@@ -78,7 +78,7 @@
         var nextXPos = 0;
         var nextYPos = 0;
         for(var i=0; i < this.labelsArray.length; ++i) {
-            var newB = new k.Button(this.labelsArray[i], "gray");
+            var newB = new K.Button(this.labelsArray[i], "gray");
             newB.bChecked = false;
             newB.set({x: nextXPos, y: nextYPos });
             nextXPos += newB.getWidth() + 5;
@@ -105,7 +105,7 @@
     }
 
 
-    k.RadioButtonGroup = createjs.promote(RadioButtonGroup, "Container");
+    K.RadioButtonGroup = createjs.promote(RadioButtonGroup, "Container");
 
 
   }
