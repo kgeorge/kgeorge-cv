@@ -14,6 +14,7 @@ import colorsys
 #import yaml
 #import simplejson as json
 import numpy as np
+from optparse import OptionParser
 
 
 r_mainImage = re.compile('(?P<imgFilename>f\d+)[.]jpg')
@@ -141,6 +142,12 @@ def processImageTupleNRGB(rootDir, mainImagename, bSkin, qLimit):
 
 
 def main():
+    parser = OptionParser()
+    parser.add_option("-m", "--mode", dest="mode",
+                  help="mode of color")
+    parser.add_option("-t", "--threshold", dest="thrshld",
+                  help="threshold")
+    (options, args) = parser.parse_args()
     #africanList = ['f31', 'f32', 'f34']
     africanList = [
         #'f31', 'f32', 'f34', 'f36', 'f37',
@@ -156,7 +163,27 @@ def main():
                     'f98', 'f99', 'f100',
                     #'f102', 'f110', 'f111',
                     'f112', 'f113', 'f114',
-                    #'f115', 'f116', 'f117'
+                    #'f115', 'f116', 'f117',
+                    'f118', 'f119', 'f120',
+                    #'f121', 'f122', 'f123',
+                    'f124', 'f125', 'f126',
+                    #'f127', 'f128', 'f129',
+                    'f130', 'f131', 'f132',
+                    #'f133', 'f134', 'f135',
+                    'f136', 'f137', 'f138',
+                    #'f139', 'f140', 'f141',
+                    'f142', 'f143', 'f144',
+                    #'f145', 'f146', 'f147',
+                    'f148', 'f149', 'f150',
+                    #'f151', 'f152', 'f153',
+                    'f154', 'f155', 'f156',
+                    #'f157', 'f158', 'f159',
+                    'f160', 'f161', 'f162',
+                    #'f153', 'f154', 'f155',
+                    'f156', 'f157', 'f158',
+                    #'f159', 'f160', 'f161',
+                    'f162', 'f163', 'f164',
+                    #'f165'
     ]
     considerList = caucasianList
 
@@ -178,7 +205,7 @@ def main():
         histImage.save( filepath)
 
     print os.path.dirname(__file__)
-    mode = "YCbCr"
+    mode = options.mode
     #mode = "YIQ"
     #mode = "NRGB"
     print os.getcwd()
