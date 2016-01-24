@@ -1,4 +1,5 @@
 __author__ = 'kgeorge'
+import sys
 import re
 import cStringIO
 import io
@@ -11,13 +12,18 @@ import os
 import json
 import cv2
 import colorsys
+try:
+    import kg.statsSampler
+except:
+    print 'usage: PYTHONPATH=./python <scriptname>'
+    sys.exit(-1)
 #import yaml
 #import simplejson as json
 import numpy as np
 from optparse import OptionParser
 
 
-r_mainImage = re.compile('(?P<imgFilename>f\d+)[.]jpg')
+r_mainImage = re.compile('(?P<imgFilename>\w+)[.]jpg')
 
 class Metrics(object):
     def __init__(self, thrshld, mode):
@@ -157,6 +163,12 @@ def processImageTupleYCbCr(rootDir, mainImagename, skinHistPath, nonSkinHistPath
             maskImagename = "%s_cls_%s_%d" % (m.group('imgFilename'), mode, thrshld) + '.png'
             return maskImagename
         return None
+    def getClassifiedOverlayImagename(imageFilename, mode, thrshld):
+        m = r_mainImage.match(imageFilename)
+        if m:
+            maskImagename = "%s_cls_%s_%d_overlay" % (m.group('imgFilename'), mode, thrshld) + '.png'
+            return maskImagename
+        return None
     maskImage = Image.open(os.path.join(rootDir, maskImagename))
     binMaskImage = maskImage.convert("1")
     assert(os.path.exists(os.path.join(rootDir, mainImagename)))
@@ -164,27 +176,45 @@ def processImageTupleYCbCr(rootDir, mainImagename, skinHistPath, nonSkinHistPath
     assert(binMaskImage.size == mainImage.size)
     yCbCrMainImage = mainImage.convert('YCbCr')
     skinHist = Image.open(os.path.join(rootDir, skinHistPath))
-    print skinHist.size
-    maskImage = Image.new("RGB", mainImage.size, "white")
+    nonSkinHist = Image.open(os.path.join(rootDir, nonSkinHistPath))
+    print nonSkinHist.size
+    maskImage = Image.new("RGB", mainImage.size, "black")
     yMainImage, cbMainImage, crMainImage = yCbCrMainImage.split()
+    smplr_skin = kg.statsSampler.StatsSampler()
+    smplr_nonSkin = kg.statsSampler.StatsSampler()
     for cb, cr, mask in zip( enumerate(cbMainImage.getdata()), enumerate(crMainImage.getdata()), enumerate(binMaskImage.getdata())):
         xy = cb[0]
         assert(cb[1] < 256 and cr[1] < 256)
         cb_2 = cb[1] * qLimit/256
         cr_2 = cr[1] * qLimit/256
-        v = skinHist.getpixel((cr_2, cb_2))
+        vSkin = skinHist.getpixel((cr_2, cb_2))
+        vNonSkin = nonSkinHist.getpixel((cr_2, cb_2))
         x =  xy % mainImage.size[0]
         y = int(xy / mainImage.size[0])
         bActualSkin = False
         if mask[1] > 0:
             bActualSkin = True
         bAlgorithmSkin = False
-        if v > thrshld:
+
+        if vSkin > vNonSkin:
             bAlgorithmSkin = True
-            maskImage.putpixel((x,y), (255,0,0))
+            maskImage.putpixel((x,y), (255,255,255))
         metrics.sample(bActualSkin, bAlgorithmSkin)
     classifiedImagename = getClassifiedImagename(mainImagename, "CbCr", thrshld)
-    maskImage.save(os.path.join(rootDir, classifiedImagename))
+
+    maskImgeCv = np.array(maskImage)
+    maskImgeCv = cv2.cvtColor(maskImgeCv, cv2.COLOR_RGB2BGR)
+    kernel = np.ones((5,5),np.uint8)
+    dilated = cv2.dilate(maskImgeCv,kernel,iterations = 1)
+    kernel = np.ones((5,5),np.uint8)
+    eroded = cv2.erode(dilated,kernel,iterations = 2)
+    cv2.imwrite(os.path.join(rootDir, classifiedImagename),eroded)
+    mainImgeCv = np.array(mainImage)
+    mainImgeCv = cv2.cvtColor(mainImgeCv, cv2.COLOR_RGB2BGR)
+    classifiedOverlayImagename = getClassifiedOverlayImagename(mainImagename, "CbCr", thrshld)
+    overlayImage = cv2.addWeighted(mainImgeCv, 0.7, eroded, 0.3, 0.0)
+    cv2.imwrite(os.path.join(rootDir, classifiedOverlayImagename), overlayImage)
+    #maskImage.save(os.path.join(rootDir, classifiedImagename))
     print 'processing image %s,\n %s' % (mainImagename, metrics)
     return metrics
 
@@ -290,7 +320,10 @@ def main():
                     #'f162', 'f163', 'f164',
                     'f165'
                 ]
-    considerList = caucasianList
+    treedetect = [
+        'treedetect31'
+    ]
+    considerList = treedetect
 
 
     def getClassifiedImagename(imageFilename, mode):

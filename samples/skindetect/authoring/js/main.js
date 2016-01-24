@@ -111,7 +111,7 @@
 
             var frameCanvasElement = document.getElementById(this.canvasId);
             var scaleX = frameCanvasElement.width/bitmap.image.width;
-            var scaleY = (frameCanvasElement.height - 30)/bitmap.image.height;
+            var scaleY = (frameCanvasElement.height)/bitmap.image.height;
             var scale = scaleX;
             if(scaleY < scaleX) {
                 scale = scaleY;
@@ -119,6 +119,7 @@
             bitmap.scaleX = scale;
             bitmap.scaleY = scale;
             this.srcImgScale = scale;
+            console.log("frameCanvasElement" ,  frameCanvasElement.width, frameCanvasElement.height)
             console.log("bitmap bounds" , name, bitmap.getBounds(), scale)
             var bitmapContainer =new createjs.Container();
 
@@ -128,7 +129,6 @@
 
             this.stage1.addChild(bitmapContainer);
             console.log("stage bounds" , name, this.stage1.getBounds())
-            //this.stage1.addChild(this.lineDrawingShape);
 
 
 
@@ -136,7 +136,6 @@
             this.authoringArea.mouseEnabled = true;
 
             this.authoringArea.addEventListener("dblclick" , this.boundHandleMouseDoubleClick );
-            //this.authoringArea.addEventListener("stagemousedown", this.boundHandleMouseDown );
             this.authoringArea.addEventListener("mousedown", this.boundHandleMouseDown );
 
             this.stage1.update();
@@ -180,24 +179,14 @@
         //-----------------------------------------------------------------------
         pushCurvesCollected: function(curveShape) {
             this.currentMode.pushCurvesCollected(curveShape);
-            //this.collectedCurves.push(curveShape);
         },
         //-----------------------------------------------------------------------
         popCurvesCollected: function() {
             this.currentMode.popCurvesCollected();
-            //if(this.collectedCurves.length > 0) {
-            //    this.collectedCurves.pop();
-            //}
         },
         //-----------------------------------------------------------------------
         stackTopCurvesCollected: function() {
             return this.currentMode.stackTopCurvesCollected();
-            /*
-            if(this.collectedCurves.length > 0) {
-                return this.collectedCurves[this.collectedCurves.length-1];
-            } else {
-                return undefined;
-            }*/
         },
         //-----------------------------------------------------------------------
         removeLastCurveShapeFromStage: function() {
@@ -207,7 +196,6 @@
                 var thisParent = lastCurveShape.parent;
                 thisParent.removeChild(lastCurveShape);
 
-                //this.stage1.removeChild(lastCurveShape);
                 this.popCurvesCollected();
             }
         },
@@ -215,6 +203,7 @@
             return str.substring(0, str.lastIndexOf(".")) + newExt
         },
         save: function() {
+                var stageBounds = this.stage1.getBounds();
                 this.updateImageVisibility(false);
                 this.stage1.update();
                 var bFill =true;
@@ -226,16 +215,13 @@
                 }
                 this.stage1.update();
                 var frameCanvasElement = document.getElementById(this.canvasId);
-                //var data = frameCanvasElement.toDataURL("image/png").replace("image/png", "image/octet-stream");
-                //window.location.href = data;
                 var srcImgFilename = this.changeExt(this.srcImgFilename, ".png");
-                //console.log( "saving image as ", this.changeExt(srcImgFilename, ".png"));
                 var canvasCopy = document.createElement("canvas");
                 var copyContext = canvasCopy.getContext("2d");
-                canvasCopy.width = frameCanvasElement.width/this.srcImgScale;
-                canvasCopy.height = frameCanvasElement.height/this.srcImgScale;
+                canvasCopy.width = stageBounds.width/this.srcImgScale;
+                canvasCopy.height = stageBounds.height/this.srcImgScale;
                 if(this.srcImgScale > 0) {
-                    copyContext.drawImage(frameCanvasElement, 0, 0, frameCanvasElement.width, frameCanvasElement.height, 0, 0, canvasCopy.width, canvasCopy.height);
+                    copyContext.drawImage(frameCanvasElement, 0, 0, stageBounds.width, stageBounds.height, 0, 0, canvasCopy.width, canvasCopy.height);
                 }
 
                 canvasCopy.toBlob(function(blob) {
