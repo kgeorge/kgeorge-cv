@@ -1,0 +1,11 @@
+To make opencv 3.1.0i for mac osx.10.x
+download opencv 3.1.0 from http://opencv.org/downloads.html
+unzip and extract te contents
+cd opencv-3.1.0
+copy the given CMakeList.txt
+mkdir build
+copy the build.sh to build dir
+./build.sh
+make
+make install
+copy libippicv.a to where your other opencv libraries are installed, mine is in /usr/local/lib

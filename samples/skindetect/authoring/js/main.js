@@ -18,7 +18,7 @@
             this.eModes = {"draw" : new k.DrawMode(this), "edit": new k.EditMode(this), "connect": new k.ConnectMode(this),  "save": new k.SaveMode(this)};
             this.currentMode = undefined;
             this.name = name;
-            this.imgUrl = baseDirUrl + srcImgFilename
+            this.baseDirUrl = baseDirUrl;
             this.srcImgFilename = srcImgFilename
             this.collectedCurves = []
             this.srcImgScale = 1.0
@@ -36,24 +36,16 @@
             this.stage2 = new createjs.Stage( toolbarCanvasElement );
 
 
-            var loader = new createjs.LoadQueue(true, null, true);
+            this.loader = new createjs.LoadQueue(true, null, true);
 
-            loader.addEventListener("fileloaderror",  function(ev){
+            this.loader.addEventListener("fileloaderror",  function(ev){
                 console.log("error: 00000000000000");
             });
-            loader.addEventListener("error",  function(ev){
+            this.loader.addEventListener("error",  function(ev){
                 console.log("error: ~~~~~~~~~~~~~");
             });
-            loader.addEventListener("complete",  function(ev){
-                console.log("complete", "88888888888888");
-            });
-            loader.addEventListener("fileload", this.loaderImgOnLoad.bind(this));
-            var loadItem = new createjs.LoadItem().set({
-                src:  this.imgUrl,
-                crossOrigin:true,
-                type: createjs.LoadQueue.IMAGE
-            });
-            loader.loadFile(loadItem);
+            this.loader.addEventListener("complete",  this.loaderOnComplete.bind(this));
+            this.loader.addEventListener("fileload", this.loaderOnLoad.bind(this));
             this.stage1.enableMouseOver(10);
 
 
@@ -69,6 +61,13 @@
             window.onkeyup = this.boundHandleKeyUp;
             this.wireupToolbar();
         },
+
+        getDataUrl: function(dataType) {
+            if(dataType == 'img') {
+                return this.baseDirUrl + this.srcImgFilename;
+            }
+        },
+
         changeMode: function(modeName) {
             if(modeName && this.currentMode != this.eModes[modeName]) {
                 var previousMode = this.currentMode;
@@ -98,12 +97,23 @@
             this.changeMode(modeNames[0]);
 
         },
-        loaderImgOnLoad: function(ev) {
-            console.log("load error~~~~~~~~~~~~")
+        loaderOnLoad : function(ev) {
+            /*
+            switch(ev.item.type) {
+                case createjs.LoadQueue.IMAGE:
+                    console.log("load event ", ev.item.type);
+                    break;
+                case createjs.LoadQueue.TEXT:
+                    console.log("load event ", ev.item.type);
+                    break;
+            }*/
+        },
 
+        loaderOnComplete : function(ev) {
+            var imgResult = this.loader.getResult(67);
             var img = document.createElement('img');
             img.crossOrigin = "Anonymous";
-            img.src = ev.result.src;
+            img.src = imgResult.src;
 
             var bitmap = new createjs.Bitmap(img);
             bitmap.x=0;
@@ -139,8 +149,19 @@
             this.authoringArea.addEventListener("mousedown", this.boundHandleMouseDown );
 
             this.stage1.update();
-
         },
+
+        loadItems: function() {
+            var imgLoadItem = new createjs.LoadItem().set({
+                src:  this.getDataUrl('img'),
+                crossOrigin:true,
+                type: createjs.LoadQueue.IMAGE,
+                id:67
+            });
+
+            this.loader.loadManifest([imgLoadItem]);
+        },
+
         updateImageVisibility: function(bVisible) {
             var bitmapImage = this.stage1.getChildByName("imageToEdit");
             bitmapImage.visible =  bVisible;
@@ -202,6 +223,11 @@
         changeExt: function(str, newExt){
             return str.substring(0, str.lastIndexOf(".")) + newExt
         },
+
+        addSuffixToFilename: function(str, suffix){
+            var lastDot = str.lastIndexOf(".");
+            return str.substring(0, lastDot) + suffix + str.substring(lastDot);
+        },
         save: function() {
                 var stageBounds = this.stage1.getBounds();
                 this.updateImageVisibility(false);
@@ -249,10 +275,140 @@
         }
     });
 
+    K.ViolaJonesFrame = K.Frame.extend({
+        init: function(canvasId, toolbarId,  name, baseDirUrl, srcImgFilename) {
+            this._super(canvasId, toolbarId,  name, baseDirUrl, srcImgFilename);
+            console.log('!!!!!@@@@!!!!', this.getDataUrl('txt'));
+        },
+
+        getDataUrl: function(dataType) {
+            if(dataType == 'txt') {
+                txtFile = this.changeExt(this.srcImgFilename, '.txt');
+                return this.baseDirUrl + txtFile;
+            } else {
+                return this._super(dataType);
+            }
+        },
+
+        loadItems: function() {
+            var imgLoadItem = new createjs.LoadItem().set({
+                src:  this.getDataUrl('img'),
+                crossOrigin:true,
+                type: createjs.LoadQueue.IMAGE,
+                id:67
+            });
+
+            var txtLoadItem = new createjs.LoadItem().set({
+                src:  this.getDataUrl('txt'),
+                crossOrigin:true,
+                type: createjs.LoadQueue.TEXT,
+                id:89
+            });
+
+            this.loader.loadManifest([imgLoadItem, txtLoadItem]);
+        },
+
+        loaderOnComplete : function(ev) {
+            this._super(ev);
+            var txtResult = this.loader.getResult(89);
+            var rbounds = this.parseText(txtResult);
+            var imgToEdit = this.stage1.getChildByName("imageToEdit");
+            var bitmap = imgToEdit.getChildAt(0);
+
+            var scaleX = bitmap.scaleX;
+            var scaleY = bitmap.scaleY;
+
+
+            var faceRect = new createjs.Shape();
+            faceRect.graphics.setStrokeStyle(2,"square").beginStroke("#ff0000");
+            faceRect.graphics.rect(rbounds.x * scaleX, rbounds.y * scaleY, rbounds.w *scaleX, rbounds.h * scaleY);
+
+            faceRect.x_pos = 0;
+            faceRect.y_pos = 0;
+            faceRect.setBounds(rbounds.x * scaleX, rbounds.y * scaleY, rbounds.w *scaleX, rbounds.h * scaleY);
+            faceRect.name = "faceRect";
+
+
+            imgToEdit.addChild(faceRect);
+            this.stage1.update();
+        },
+
+        parseText: function(txt) {
+            vtxt = txt.split('\n');
+            if(vtxt.length > 1) {
+                var regexp_expected = /\w+:\s+(\d+),\s+(\d+),\s+(\d+),\s+(\d+)/;
+                var dims_recovered = regexp_expected.exec(vtxt[1]);
+                if(dims_recovered.length > 4) {
+                    var x = parseInt(dims_recovered[1])
+                    var y = parseInt(dims_recovered[2])
+                    var w = parseInt(dims_recovered[3])
+                    var h = parseInt(dims_recovered[4])
+                    return {x: x, y: y, w: w, h:h}
+                }
+                console.log(dims_recovered);
+            }
+        },
+        save: function() {
+                var stageBounds = this.stage1.getBounds();
+                this.updateImageVisibility(false);
+                this.stage1.update();
+
+
+
+                var imgToEdit = this.stage1.getChildByName("imageToEdit");
+                var faceRect = imgToEdit.getChildByName("faceRect");
+                var faceRectBounds = faceRect.getBounds();
+
+                var bitmap = imgToEdit.getChildAt(0);
+
+                var scaleX = bitmap.scaleX;
+                var scaleY = bitmap.scaleY;
+
+                console.log('*********', faceRect.getBounds());
+
+                var bFill =true;
+                var fillColor="white";
+                var fillAlpha = 1.0;
+                for(var k=0; k < this.collectedCurves.length; k +=1) {
+                    var currentCurve = this.collectedCurves[k];
+                    currentCurve.redrawCurveShapeGraphics(bFill, fillAlpha, fillColor);
+                }
+                this.stage1.update();
+                var frameCanvasElement = document.getElementById(this.canvasId);
+                var srcImgFilename = this.changeExt(this.srcImgFilename, ".png");
+                var canvasCopy = document.createElement("canvas");
+                var copyContext = canvasCopy.getContext("2d");
+                canvasCopy.width = faceRectBounds.width/scaleX;
+                canvasCopy.height = faceRectBounds.height/scaleY;
+                if(this.srcImgScale > 0) {
+                    copyContext.drawImage(frameCanvasElement, faceRectBounds.x, faceRectBounds.y, faceRectBounds.width, faceRectBounds.height, 0, 0, canvasCopy.width, canvasCopy.height);
+                }
+
+
+                var filePart_splits = srcImgFilename.split("/");
+                var filePart = filePart_splits[filePart_splits.length - 1  ];
+                if (filePart.match(/_vj.png/)) {
+                    fileNameToSave = this.addSuffixToFilename(filePart,"_mask");
+                    canvasCopy.toBlob(function(blob) {
+                        saveAs(blob, fileNameToSave );
+                    });
+                }
+
+                for(var k=0; k < this.collectedCurves.length; k +=1) {
+                    var currentCurve = this.collectedCurves[k];
+                    currentCurve.redrawCurveShapeGraphics(bFill);
+                }
+        }
+    });
+
+
     K.init = function (query) {
         var sourceImgFilename = query.sourceImgFilename || "f0.jpg"
-        var baseDataDir = "http://localhost:8000/samples/skindetect/authoring/image/"
-        K.frame = new K.Frame("demoCanvasFrame", "demoToolbar", "frame",  baseDataDir, sourceImgFilename );
+        var baseDatadir = query.baseDatadir || "skindetect/authoring/image"
+        baseDatadir = "http://localhost:8000/" + baseDatadir + "/";
+        //K.frame = new K.ViolaJonesFrame("demoCanvasFrame", "demoToolbar", "frame",  baseDatadir, sourceImgFilename );
+        K.frame = new K.Frame("demoCanvasFrame", "demoToolbar", "frame",  baseDatadir, sourceImgFilename );
+        K.frame.loadItems();
     }
 
   }

@@ -44,27 +44,99 @@ def processImageTupleYCbCr_gmm(rootDir, mainImagename,  qLimit):
     yMainImage, cbMainImage, crMainImage = yCbCrMainImage.split()
     cBcR_skin = []
     cBcR_noSkin = []
+    w, h = cbMainImage.size
     for cb, cr, mask in zip( enumerate(cbMainImage.getdata()), enumerate(crMainImage.getdata()), enumerate(binMaskImage.getdata())):
         assert(cb[1] < 256 and cr[1] < 256)
         cb_2 = cb[1] * qLimit/256
         cr_2 = cr[1] * qLimit/256
+
+
         if mask[1] > 0:
             cBcR_skin.append((cb_2, cr_2))
         else:
             cBcR_noSkin.append((cb_2,cr_2))
     return (np.array(cBcR_skin), np.array(cBcR_noSkin))
 
+def normalizeFloatImage2(floatImage):
+    mn_0 = np.nanmin(np.nanmin(floatImage[:, :,0]))
+    mx_0 = np.nanmax(np.nanmax(floatImage[:, :, 0]))
+
+    mn_1 = np.nanmin(np.nanmin(floatImage[:, :,1]))
+    mx_1 = np.nanmax(np.nanmax(floatImage[:, :, 1]))
+    rows = floatImage.shape[0]
+    cols = floatImage.shape[1]
+    fctr = 255.0/(mx_0 - mn_0)
+    mn_0 = 1000
+    mx_0 =-1000
+    for r in range(rows):
+        for c in range(cols):
+            if floatImage[r,c, 0] > -99:
+                mn_0 = mn_0 if mn_0 <=  floatImage[r,c, 0 ] else floatImage[r,c, 0 ]
+                mx_0 = mx_0 if mx_0  >=  floatImage[r,c, 0 ] else floatImage[r,c, 0 ]
+
+            if floatImage[r,c, 1] > -99:
+                mn_1 = mn_1 if mn_1 <=  floatImage[r,c, 1 ] else floatImage[r,c, 1 ]
+                mx_1 = mx_1 if mx_1  >=  floatImage[r,c, 1 ] else floatImage[r,c, 1 ]
+
+    print "mn_0: ", mn_0, "  mx_0: ", mx_0
+    print "mn_1: ", mn_1, "  mx_1: ", mx_1
 
 
+def normalizeFloatImage3(floatImage):
+
+    mn_0 = np.nanmin(np.nanmin(floatImage[:, :,1]))
+    mx_0 = np.nanmax(np.nanmax(floatImage[:, :, 1]))
+
+    rows = floatImage.shape[0]
+    cols = floatImage.shape[1]
+    mn_0 = 1000
+    mx_0 =-1000
+    for r in range(rows):
+        for c in range(cols):
+            if floatImage[r,c, 2] <= 0:
+                mn_0 = mn_0 if mn_0 <=  floatImage[r,c, 1 ] else floatImage[r,c, 1 ]
+                mx_0 = mx_0 if mx_0  >=  floatImage[r,c, 1 ] else floatImage[r,c, 1 ]
+
+    fctr_0 = 255.0/(mx_0 - mn_0)
+
+    for r in range(rows):
+        for c in range(cols):
+            if floatImage[r,c, 2]  <= 0:
+                floatImage[r,c, 1] = (floatImage[r,c, 1] - mn_0) * fctr_0
+            else:
+                floatImage[r,c, 1]=0
+
+    print "mn_0: ", mn_0, "  mx_0: ", mx_0
 
 
 def processImageTupleYCbCr_predict_gmm(rootDir, mainImagename, g_skin, g_noSkin, qLimit):
+    def getImageIndex(r, c, w):
+        return r * w + c
+    def inspectNeighborhood(r_y, c_x, halfWindow=3):
+        for d_r in range(-1,2):
+            for d_c in range(-1,2):
+                xy_neighbor = getImageIndex(r_y + d_r, c_x + d_c, mainImage.size[0])
+                assert(xy_neighbor < len(cbMainImage.getdata()))
+                cb_neighbor = cbMainImage.getdata()[xy_neighbor]
+                cr_neighbor = crMainImage.getdata()[xy_neighbor]
+                cb_neighbor2 = cb_neighbor * qLimit/256
+                cr_neighbor2 = cr_neighbor * qLimit/256
+
+                skinScore = g_skin.score(np.array([[cb_neighbor2, cr_neighbor2]]))
+                nonSkinScore = g_noSkin.score(np.array([(cb_neighbor2, cr_neighbor2)]))
+        pass
     mode = "YCbCr"
     maskImagename = getMaskImagename(mainImagename)
     def getClassifiedImagename(imageFilename, mode):
         m = r_mainImage.match(imageFilename)
         if m:
             maskImagename = "%s_gmm_%s" % (m.group('imgFilename'), mode) + '.png'
+            return maskImagename
+        return None
+    def getThresholdedImagename(imageFilename, mode):
+        m = r_mainImage.match(imageFilename)
+        if m:
+            maskImagename = "%s_gmm_thrshld_diff_%s" % (m.group('imgFilename'), mode) + '.png'
             return maskImagename
         return None
     def getClassifiedOverlayImagename(imageFilename, mode):
@@ -78,9 +150,13 @@ def processImageTupleYCbCr_predict_gmm(rootDir, mainImagename, g_skin, g_noSkin,
     assert(os.path.exists(os.path.join(rootDir, mainImagename)))
     mainImage = Image.open(os.path.join(rootDir, mainImagename))
     assert(binMaskImage.size == mainImage.size)
+
     yCbCrMainImage = mainImage.convert('YCbCr')
     maskImage = Image.new("RGB", mainImage.size, "black")
     yMainImage, cbMainImage, crMainImage = yCbCrMainImage.split()
+    thresholdedOutImg_0 = np.zeros((yMainImage.size[1],yMainImage.size[0],3), dtype = np.float)
+    thresholdedOutImg_1 = np.zeros((yMainImage.size[1],yMainImage.size[0],3), dtype = np.float)
+    thresholdedOutImg = np.zeros((yMainImage.size[1], yMainImage.size[0]), dtype = np.float)
     for cb, cr, mask in zip( enumerate(cbMainImage.getdata()), enumerate(crMainImage.getdata()), enumerate(binMaskImage.getdata())):
         xy = cb[0]
         assert(cb[1] < 256 and cr[1] < 256)
@@ -88,18 +164,41 @@ def processImageTupleYCbCr_predict_gmm(rootDir, mainImagename, g_skin, g_noSkin,
         cr_2 = cr[1] * qLimit/256
         skinScore = g_skin.score(np.array([[cb_2, cr_2]]))
         nonSkinScore = g_noSkin.score(np.array([(cb_2, cr_2)]))
-        x =  xy % mainImage.size[0]
-        y = int(xy / mainImage.size[0])
+
+
+        c_x =  xy % mainImage.size[0]
+        r_y = int(xy / mainImage.size[0])
+
+        #inspectNeighborhood(r_y, c_x, cbMainImage.getdata(), crMainImage.getdata(), binMaskImage.getdata())
+        thresholdedOutImg[r_y, c_x] = skinScore / nonSkinScore
+        try:
+
+            thresholdedOutImg_0[r_y, c_x, 2] =  128
+            thresholdedOutImg_1[r_y, c_x, 2] =  0
+            if mask[1] > 0:
+                thresholdedOutImg_0[r_y, c_x, 2] =  0
+                thresholdedOutImg_1[r_y, c_x, 2] =  128
+                if skinScore <= nonSkinScore:
+                    thresholdedOutImg_0[r_y, c_x, 1] = -(skinScore - nonSkinScore)
+            else:
+                if skinScore > nonSkinScore:
+                    thresholdedOutImg_1[r_y, c_x, 1] = skinScore - nonSkinScore
+        except IndexError:
+            print xy, c_x, r_y
         bActualSkin = False
         if mask[1] > 0:
             bActualSkin = True
         bAlgorithmSkin = False
 
         if skinScore > nonSkinScore:
+            #get neighbor hood
+            assert(cb[0] == cr[0])
+            assert(cb[0] == mask[0])
             bAlgorithmSkin = True
-            maskImage.putpixel((x,y), (255,255,255))
+            maskImage.putpixel((c_x,r_y), (255,255,255))
     classifiedImagename = getClassifiedImagename(mainImagename, "CbCr")
-
+    normalizeFloatImage3(thresholdedOutImg_0)
+    normalizeFloatImage3(thresholdedOutImg_1)
     maskImgeCv = np.array(maskImage)
     maskImgeCv = cv2.cvtColor(maskImgeCv, cv2.COLOR_RGB2BGR)
     #cv2.imwrite(os.path.join(rootDir, "foo.png"), maskImgeCv)
@@ -112,6 +211,8 @@ def processImageTupleYCbCr_predict_gmm(rootDir, mainImagename, g_skin, g_noSkin,
     mainImgeCv = cv2.cvtColor(mainImgeCv, cv2.COLOR_RGB2BGR)
     classifiedOverlayImagename = getClassifiedOverlayImagename(mainImagename, "CbCr")
     overlayImage = cv2.addWeighted(mainImgeCv, 0.7, maskImgeCv, 0.3, 0.0)
+    cv2.imwrite(os.path.join(rootDir, getThresholdedImagename(mainImagename, "CbCr_0")), thresholdedOutImg_0)
+    cv2.imwrite(os.path.join(rootDir, getThresholdedImagename(mainImagename, "CbCr_1")), thresholdedOutImg_1)
     cv2.imwrite(os.path.join(rootDir, classifiedOverlayImagename), overlayImage)
     print 'processing image %s,\n' % (mainImagename)
     return
@@ -125,22 +226,54 @@ def saveHistImage(hist, filepath):
     histImageRgb = histImage.convert('RGB')
     histImage.save( filepath)
 
-def fit2(dataSets, qlimit =128, mode = "YCbCr", rootDataDir= 'samples/skindetect/authoring/image'):
+
+
+def fit2(cBcR_skin_all_data_for_fit, cBcR_noSkin_all_data_for_fit, n_components=5, mode = "YCbCr"):
+
+    g_skin = g_noSkin = None
+
+    if mode == "NRGB":
+        raise Exception('not implemented')
+    elif mode == "YCbCr":
+        print "cBcR_skin_all_data_for_fit.shape", cBcR_skin_all_data_for_fit.shape
+        g_skin = mixture.GMM(n_components=n_components)
+        g_skin.fit(cBcR_skin_all_data_for_fit)
+        g_noSkin = mixture.GMM(n_components=n_components)
+        g_noSkin.fit(cBcR_noSkin_all_data_for_fit)
+
+    return (g_skin, g_noSkin)
+
+
+def evaluate_gmm_with_n_components(cBcR_skin_all_data_for_fit, cBcR_noSkin_all_data_for_fit,  mode = "YCbCr"):
+    g_skin = g_noSkin = None
+
+    if mode == "NRGB":
+        raise Exception('not implemented')
+    elif mode == "YCbCr":
+        print "cBcR_skin_all_data_for_fit.shape", cBcR_skin_all_data_for_fit.shape
+        for k in range(1,11):
+            g_skin = mixture.GMM(n_components=k, covariance_type='full')
+            g_skin.fit(cBcR_skin_all_data_for_fit)
+            print g_skin.means_
+            dummyData = np.zeros(shape=(1, cBcR_skin_all_data_for_fit.shape[1]))
+            dummyData[0, :] = cBcR_skin_all_data_for_fit[0, :]
+            aic_skin = g_skin.aic(cBcR_skin_all_data_for_fit)
+            g_noSkin = mixture.GMM(n_components=k, covariance_type='full')
+            g_noSkin.fit(cBcR_noSkin_all_data_for_fit)
+            aic_noSkin = g_noSkin.aic(cBcR_noSkin_all_data_for_fit)
+            print k, aic_skin, aic_noSkin
+
+
+def collectData(dataSets, qlimit =128, mode = "YCbCr"):
     def getMaskImagename2(imageFilename):
         maskImagename = imageFilename + '_mask.png'
         return maskImagename
 
-    cBcRHist_skin_sum = np.zeros((qlimit, qlimit), dtype=np.float)
-    cBcRHist_noSkin_sum = np.zeros((qlimit, qlimit), dtype=np.float)
-    nrgHist_skin_sum = np.zeros((qlimit, qlimit), dtype=np.float)
-    nrgHist_noSkin_sum = np.zeros((qlimit, qlimit), dtype=np.float)
     maxSampleFiles = -1
     cBcR_skin_sum_list = []
     cBcR_noSkin_sum_list = []
     nSampleFilesSoFar =0
 
-    n_components = 5
-    g_skin = g_noSkin = None
     try:
         for r, dataSet in dataSets.iteritems():
             for name in dataSet:
@@ -164,21 +297,7 @@ def fit2(dataSets, qlimit =128, mode = "YCbCr", rootDataDir= 'samples/skindetect
 
     except StopIteration as e:
         pass
-    if mode == "NRGB":
-        raise Exception('not implemented')
-    elif mode == "YCbCr":
-        cBcR_skin_sum = np.concatenate(cBcR_skin_sum_list)
-        cBcR_noSkin_sum = np.concatenate(cBcR_noSkin_sum_list)
-        print "cBcR_skin_sum.shape", cBcR_skin_sum.shape
-        g_skin = mixture.GMM(n_components=n_components)
-        g_skin.fit(cBcR_skin_sum)
-        g_noSkin = mixture.GMM(n_components=n_components)
-        g_noSkin.fit(cBcR_noSkin_sum)
-        saveHistImage(cBcRHist_skin_sum, os.path.join(r, "hist_cbcr_skin.png"))
-        saveHistImage(cBcRHist_noSkin_sum, os.path.join(r, "hist_cbcr_noSkin.png"))
-    return (g_skin, g_noSkin)
-
-
+    return (np.concatenate(cBcR_skin_sum_list), np.concatenate(cBcR_noSkin_sum_list))
 
 def main():
     parser = OptionParser()
@@ -273,8 +392,25 @@ def main():
     africanList_predict = [ f for idx, f in filter ( lambda (idx, f): idx %2 != 0, enumerate(africanList) )]
     considerList_fit = [ f for idx, f in filter ( lambda (idx, f): idx %2 == 0, enumerate(caucasianList) )]
     considerList_predict = [ f for idx, f in filter ( lambda (idx, f): idx %2 != 0, enumerate(caucasianList) )]
-    g_skin, g_noSkin = fit2({rootDataDir : considerList_fit, os.path.join(rootDataDir, 'black') : africanList_fit})
+    (cBcR_skin_data_for_fit, cBcR_noSkin_data_for_fit) = collectData({rootDataDir : considerList_fit, os.path.join(rootDataDir, 'black') : africanList_fit})
+    #evaluate_gmm_with_n_components(cBcR_skin_data_for_fit, cBcR_noSkin_data_for_fit, mode="YCbCr")
+    """
+This produced the following result.
+1 13794423.0642 42111054.0496
+2 13142249.6363 37740761.1692
+3 12666717.7048 36718344.8858
+4 12422719.7046 35732041.1953
+5 12273082.8733 35144556.9394
+6 12213520.9491 34752581.6618
+7 12154175.3038 34737119.6411
+8 11616663.5811 32558300.2443
+9 12120952.4259 30129390.2751
+10 11397247.673 32367938.5858
+    """
+    (g_skin, g_noSkin) = fit2(cBcR_skin_data_for_fit, cBcR_noSkin_data_for_fit, n_components=5)
     print "fit phase done: gmm_skin: %r, gmm_nonSkin: %r" % (g_skin, g_noSkin)
+    print "gmm_skin: weights, gmm_nonSkin: %r" %  g_skin.weights_
+    print "gmm_skin: weights, gmm_nonSkin: %r" % g_noSkin.weights_
     predict_gmm(
         {
             os.path.join(rootDataDir, 'misc'): ['f_hand'],

@@ -204,6 +204,7 @@ def processImageTupleYCbCr(rootDir, mainImagename, skinHistPath, nonSkinHistPath
 
     maskImgeCv = np.array(maskImage)
     maskImgeCv = cv2.cvtColor(maskImgeCv, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(os.path.join(rootDir, "foo.png"), maskImgeCv)
     kernel = np.ones((5,5),np.uint8)
     dilated = cv2.dilate(maskImgeCv,kernel,iterations = 1)
     kernel = np.ones((5,5),np.uint8)

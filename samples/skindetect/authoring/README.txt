@@ -19,7 +19,7 @@ The image to edit should be in samples/skindetect/authoring/image as fxxx.jpg
 
 Eg: if you need to edit f16.jpg, it can be brought up in the editor as .
 
-http://localhost:8000/samples/skindetect/authoring/index.html?sourceImgFilename=f16.jpg
+http://localhost:8000/samples/skindetect/authoring/index.html?baseDataDir=skindetect/authoring/image,sourceImgFilename=f16.jpg
 
 4)
 In the draw mode you can draw curves to outline the skin

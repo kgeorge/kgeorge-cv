@@ -22,7 +22,8 @@ else
 	CONFIG=RELEASE
 	FORGIVING-CXXFLAGS=-Wno-unused-variable -Wno-reorder  -D NDEBUG
 	OPENCV-INCLUDES = $(shell /usr/local/bin/pkg-config --cflags opencv)
-	OPENCV-LIBS-DIR = $(shell /usr/local/bin/pkg-config --libs opencv | dirname `awk '{ print $$1 }'`)
+	OPENCV-LIBS-DIR = /usr/local/lib
+	#OPENCV-LIBS-DIR = $(shell /usr/local/bin/pkg-config --libs opencv | dirname `awk '{ print $$1 }'`)
 	GTEST-LIBS-DIR = $(GIT_ROOT)/thirdparty/gtest-1.7.0/lib/release
 	GTEST-INCLUDES = -I$(GIT_ROOT)/thirdparty/gtest-1.7.0/include
 	EIGEN-LIBS = $(shell /usr/local/bin/pkg-config --libs eigen3)
@@ -32,26 +33,37 @@ endif
 
 
 OPENCV-LIBS=\
-	$(OPENCV-LIBS-DIR)/libopencv_calib3d.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_contrib.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_core.dylib   \
-	$(OPENCV-LIBS-DIR)/libopencv_features2d.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_flann.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_gpu.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_highgui.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_imgproc.dylib  \
-	$(OPENCV-LIBS-DIR)/libopencv_legacy.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_ml.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_nonfree.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_objdetect.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_ocl.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_photo.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_stitching.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_superres.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_ts.a \
-	$(OPENCV-LIBS-DIR)/libopencv_video.dylib \
-	$(OPENCV-LIBS-DIR)/libopencv_videostab.dylib \
-	-F /System/Library/Frameworks   -framework OpenGL -framework AGL
+        -L/usr/local/lib -lopencv_core -lopencv_highgui -lippicv \
+        -F /System/Library/Frameworks   -framework OpenGL -framework AGL
+
+#OPENCV-LIBS=\
+#        /usr/local/lib/libopencv_core.a \
+#        /usr/local/lib/libopencv_calib3d.a \
+#        /usr/local/lib/libopencv_features2d.a \
+#        /usr/local/lib/libopencv_highgui.a \
+#        /usr/local/lib/libopencv_imgproc.a \
+#        -F /System/Library/Frameworks   -framework OpenGL -framework AGL
+#OPENCV-LIBS=\
+#	$(OPENCV-LIBS-DIR)/libopencv_calib3d.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_contrib.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_core.dylib   \
+#	$(OPENCV-LIBS-DIR)/libopencv_features2d.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_flann.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_gpu.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_highgui.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_imgproc.dylib  \
+#	$(OPENCV-LIBS-DIR)/libopencv_legacy.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_ml.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_nonfree.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_objdetect.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_ocl.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_photo.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_stitching.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_superres.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_ts.a \
+#	$(OPENCV-LIBS-DIR)/libopencv_video.dylib \
+#	$(OPENCV-LIBS-DIR)/libopencv_videostab.dylib \
+
 
 GTEST-LIBS=\
 	$(GTEST-LIBS-DIR)/libgtest.a \
@@ -60,7 +72,7 @@ GTEST-LIBS=\
 
 
 CXX=clang++
-CXXFLAGS=-g -Wall -Wno-deprecated $(FORGIVING-CXXFLAGS) -std=c++11 -D WITH_OPENGL  $(OPENCV-INCLUDES) $(EIGEN-INCLUDES) $(KGEORGECV-INCLUDES)
+CXXFLAGS=-g  -v -Wall -Wno-deprecated $(FORGIVING-CXXFLAGS) -std=c++11 -D WITH_OPENGL  $(OPENCV-INCLUDES) $(EIGEN-INCLUDES) $(KGEORGECV-INCLUDES)
 LDFLAGS= $(OPENCV-LIBS) $(EIGEN-LIBS)
 
 BUILD-DIR=build
@@ -79,7 +91,8 @@ all:  $(TESTPROG)
 $(TESTOBJS) : | $(BUILD-DIR)
 
 
-$(TESTPROG): $(TESTOBJS) 
+$(TESTPROG): $(TESTOBJS)
+	@echo linking $(CONFIG) configuration for test, LDFLAGS is $(LDFLAGS)
 	$(CXX) -v -o $(TESTPROG)  $(TESTOBJS) $(LDFLAGS) $(GTEST-LIBS)
 
 

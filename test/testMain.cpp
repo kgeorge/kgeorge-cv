@@ -1,14 +1,15 @@
 #include <gtest/gtest.h>
 
+
+using namespace std;
 #include <opencv2/core/core.hpp>
-#include <opencv2/nonfree/nonfree.hpp>
+//#include <opencv2/nonfree/nonfree.hpp>
 
 #include "kgeorge_cv/kgLocalitySensitiveHash.hpp"
 #include "kgeorge_cv/kgUtils.hpp"
 #include "kgeorge_cv/kgCommonTraits.hpp"
 
 
-using namespace std;
 using namespace cv;
 
 
@@ -229,7 +230,7 @@ TEST( LocalitySensitiveHashing, Serialization1) {
 
     const std::string fname("data/dump/testhash1.xml");
     {
-        cv::FileStorage fs(fname, cv::FileStorage::WRITE);
+        FileStorage fs(fname, FileStorage::WRITE);
         fs << "HashTable";
         hashEngine.serialize(fs);
         fs.release();
