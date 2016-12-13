@@ -1,3 +1,10 @@
+*.DS_Store
+*.swp
+.idea/*
+samples/skindetect/authoring/image/*
+
+*.pyc
+
 # Compiled Object files
 *.slo
 *.lo

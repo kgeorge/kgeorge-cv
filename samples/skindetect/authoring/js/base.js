@@ -26,7 +26,7 @@
         container.startPoint = relPos;
         container.drawColor = createjs.Graphics.getHSL(Math.random()*360, 100, 50);
         container.name = name;
-
+        container.curve_out_color_kind=0
 
 
         var lineDrawingShape = new createjs.Shape().set({x:0,y:0});

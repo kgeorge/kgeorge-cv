@@ -126,14 +126,42 @@
             console.log("KKKKKKKKKKKKKKKKKK", evt.keyCode);
             this.keyState[evt.keyCode] = evt;
         },
+
+        update_out_color_kind: function(keyNum) {
+            keyNum = keyNum- 48
+            this.selectedCurve.curve_out_color_kind = keyNum
+            saturation_col = (keyNum == 0) ? 100 : (50 - 10*keyNum)
+            this.selectedCurve.drawColor = createjs.Graphics.getHSL(0, 0, saturation_col);
+            var bFill = true;
+            this.selectedCurve.redrawCurveShapeGraphics(bFill);
+            console.log('youpressed ', 1, this.selectedCurve.name);
+        },
+
         tick: function() {
             if (Object.keys(this.keyState).length > 0 ) {
-                //keycode for z == 9-, Ctrl == 17
+                //keycode for z == 90, Ctrl == 17
                 if(this.keyState[90]) {
                     if(this.keyState[17] || this.keyState[90].ctrlKey) {
                         this.removeLastCurveShapeFromStage();
                         this.keyState = {}
                     }
+                } else if (this.keyState[49] || this.keyState[50] || this.keyState[51] || this.keyState[52]) {
+                    var keyNum=8;
+                    if(this.keyState[49]) {
+                        keyNum=49;
+                    } else if (this.keyState[50]) {
+                        keyNum = 50;
+                    } else if (this.keyState[51]) {
+                        keyNum = 51;
+                    }  else if (this.keyState[52]) {
+                        keyNum = 52;
+                    }
+
+                    if (this.currentMode.selectedCurve) {
+                        this.currentMode.update_out_color_kind(keyNum);
+                        console.log('youpressed ', 1, this.currentMode.selectedCurve.name);
+                    }
+                    this.keyState={}
                 }
             }
             if(this.currentMode.currentState == "draw") {
