@@ -237,6 +237,7 @@
                 var fillAlpha = 1.0;
                 for(var k=0; k < this.collectedCurves.length; k +=1) {
                     var currentCurve = this.collectedCurves[k];
+                    fillColor=(currentCurve.curve_out_color_kind ==0) ? "white" :  currentCurve.drawColor
                     currentCurve.redrawCurveShapeGraphics(bFill, fillAlpha, fillColor);
                 }
                 this.stage1.update();
@@ -246,6 +247,9 @@
                 var copyContext = canvasCopy.getContext("2d");
                 canvasCopy.width = stageBounds.width/this.srcImgScale;
                 canvasCopy.height = stageBounds.height/this.srcImgScale;
+
+                copyContext.fillStyle = "rgb(0,0,0)"; // sets the color to fill in the rectangle with
+                copyContext.fillRect(0, 0, canvasCopy.width, canvasCopy.height);
                 if(this.srcImgScale > 0) {
                     copyContext.drawImage(frameCanvasElement, 0, 0, stageBounds.width, stageBounds.height, 0, 0, canvasCopy.width, canvasCopy.height);
                 }
@@ -380,6 +384,8 @@
                 var copyContext = canvasCopy.getContext("2d");
                 canvasCopy.width = faceRectBounds.width/scaleX;
                 canvasCopy.height = faceRectBounds.height/scaleY;
+                copyContext.fillStyle = "rgb(0,0,0)"; // sets the color to fill in the rectangle with
+                copyContext.fillRect(0, 0, canvasCopy.width, canvasCopy.height);
                 if(this.srcImgScale > 0) {
                     copyContext.drawImage(frameCanvasElement, faceRectBounds.x, faceRectBounds.y, faceRectBounds.width, faceRectBounds.height, 0, 0, canvasCopy.width, canvasCopy.height);
                 }
@@ -400,11 +406,9 @@
                 }
         }
     });
-
-
     K.init = function (query) {
-        var sourceImgFilename = query.sourceImgFilename || "f0.jpg"
-        var baseDatadir = query.baseDatadir || "skindetect/authoring/image"
+        var sourceImgFilename = query.sourceImgFilename || "f16.jpg"
+        var baseDatadir = query.baseDatadir || "samples/skindetect/authoring/image"
         baseDatadir = "http://localhost:8000/" + baseDatadir + "/";
         //K.frame = new K.ViolaJonesFrame("demoCanvasFrame", "demoToolbar", "frame",  baseDatadir, sourceImgFilename );
         K.frame = new K.Frame("demoCanvasFrame", "demoToolbar", "frame",  baseDatadir, sourceImgFilename );
